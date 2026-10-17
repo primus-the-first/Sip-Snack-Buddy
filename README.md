@@ -43,4 +43,4 @@ Needs JDK 17+ and the Android SDK (platform 35).
 2. Build, then sign with the same key as every earlier release (keep the key outside the repo):
    `./gradlew :app:assembleRelease`, then `zipalign -p 4` and `apksigner sign --ks <key>` to make `SipSnack-<version>.apk`.
 3. Add the APK (and optional `notes/<version>.md`) to the `releases` branch and push it.
-4. Push a tag `v<version>` on `main`. The Release workflow publishes a GitHub Release with the APK attached.
+4. Push a tag `v<version>` on `main`, or open Actions > Release > Run workflow and type the tag. The workflow publishes a GitHub Release with the APK attached.
