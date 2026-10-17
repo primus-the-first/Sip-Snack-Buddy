@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- An electric-blue water drop with a little shine. -->
+    <path android:fillColor="#3D8BFF"
+        android:pathData="M54,26C62,36 70,46 70,57A16,16 0,0 1,38,57C38,46 46,36 54,26Z" />
+    <path android:fillColor="#BFD8FF"
+        android:pathData="M46,58A8,8 0,0 0,52,66L52,70A12,12 0,0 1,42,58Z" />
+</vector>

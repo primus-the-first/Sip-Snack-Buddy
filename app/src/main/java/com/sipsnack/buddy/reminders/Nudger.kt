@@ -1,0 +1,149 @@
+package com.sipsnack.buddy.reminders
+
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import com.sipsnack.buddy.MainActivity
+import com.sipsnack.buddy.R
+import com.sipsnack.buddy.data.AppDb
+import com.sipsnack.buddy.data.Prefs
+import com.sipsnack.buddy.rules.Hydration
+import com.sipsnack.buddy.rules.LogKind
+import com.sipsnack.buddy.rules.Meal
+import com.sipsnack.buddy.rules.Meals
+import com.sipsnack.buddy.rules.Moment
+import com.sipsnack.buddy.rules.Nudges
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit
+import kotlin.math.ceil
+
+object Nudger {
+    const val EXTRA_MOMENT = "moment"
+    private const val CHANNEL_DELAY = "delay"
+    private const val CHANNEL_STILL = "still_delaying"
+    private const val CHANNEL_MEALS = "meals"
+    private const val WORK = "nudge-check"
+
+    /** Each channel carries its meme sound; Android fixes a channel's sound once it exists. */
+    fun createChannels(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build()
+        fun raw(res: Int) = Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/$res")
+        manager.createNotificationChannels(
+            listOf(
+                NotificationChannel(CHANNEL_DELAY, "Water nudges", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "The side-eye when you're behind on water"
+                    setSound(raw(R.raw.delay_sound), attrs)
+                },
+                NotificationChannel(CHANNEL_STILL, "Still delaying", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "The follow-up when a nudge is ignored"
+                    setSound(raw(R.raw.still_delaying_sound), attrs)
+                },
+                NotificationChannel(CHANNEL_MEALS, "Meal nudges", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "When lunch or dinner hasn't been logged"
+                },
+            ),
+        )
+    }
+
+    fun schedule(context: Context) {
+        val request = PeriodicWorkRequestBuilder<NudgeWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+    }
+
+    fun notify(context: Context, moment: Moment, cupsBehind: Int, meal: Meal? = null) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val (channel, title, text) = when (moment) {
+            Moment.STILL_DELAYING -> Triple(CHANNEL_STILL, "Akrobeto says go and drink your water.", behindText(cupsBehind, "Come on, go back to your bottle."))
+            Moment.MEAL_DELAY -> Triple(
+                CHANNEL_MEALS,
+                if (meal == Meal.DINNER) "Dinner time, love." else "Lunch o!",
+                "No ${if (meal == Meal.DINNER) "dinner" else "lunch"} logged yet. Eat something good.",
+            )
+            else -> Triple(CHANNEL_DELAY, "The sea lion has noticed.", behindText(cupsBehind, "Tap for the full side-eye."))
+        }
+        val open = PendingIntent.getActivity(
+            context,
+            moment.ordinal,
+            Intent(context, MainActivity::class.java).putExtra(EXTRA_MOMENT, moment.name).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF3D8BFF.toInt())
+            .setContentTitle(title)
+            .setContentText(text)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(if (moment == Moment.MEAL_DELAY) 2 else 1, notification)
+    }
+
+    private fun behindText(cups: Int, tail: String) =
+        if (cups >= 1) "$cups ${if (cups == 1) "cup" else "cups"} behind. $tail" else "No water in a while. $tail"
+}
+
+class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val prefs = Prefs(applicationContext)
+        if (!prefs.nudgesOn) return Result.success()
+
+        val zone = ZoneId.systemDefault()
+        val now = ZonedDateTime.now(zone)
+        val today = now.toLocalDate()
+        val dayStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        val minuteOfDay = now.hour * 60 + now.minute
+        val entries = AppDb.get(applicationContext).logs()
+            .betweenNow(dayStart, dayStart + 24 * 60 * 60 * 1000L)
+            .map { it.toEntry() }
+
+        val cups = Hydration.cups(entries)
+        val goal = prefs.goal
+        val window = prefs.window
+        val lastDrink = entries.filter { it.kind == LogKind.WATER || it.kind == LogKind.OTHER_DRINK }.maxOfOrNull { it.atMillis }
+        val state = prefs.nudgeState(today)
+        val moment = Nudges.decide(now.toInstant().toEpochMilli(), minuteOfDay, dayStart, cups, goal, lastDrink, state, window)
+        if (moment != null) {
+            val behind = ceil(Hydration.expectedCups(goal, minuteOfDay, window) - cups).toInt().coerceAtLeast(0)
+            Nudger.notify(applicationContext, moment, behind)
+            prefs.saveNudge(
+                state.copy(
+                    lastNudgeAtMillis = now.toInstant().toEpochMilli(),
+                    nudgesToday = state.nudgesToday + 1,
+                    lastWasEscalation = moment == Moment.STILL_DELAYING,
+                ),
+                today,
+            )
+        }
+
+        if (window.isAwake(minuteOfDay)) {
+            val mealMinutes = entries.filter { it.kind == LogKind.MEAL }.map {
+                ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(it.atMillis), zone).let { t -> t.hour * 60 + t.minute }
+            }
+            Meals.missing(minuteOfDay, mealMinutes, prefs.mealsNudged(today))?.let { meal ->
+                Nudger.notify(applicationContext, Moment.MEAL_DELAY, 0, meal)
+                prefs.markMealNudged(meal, today)
+            }
+        }
+        return Result.success()
+    }
+}
+
+fun LocalDate.startMillis(zone: ZoneId = ZoneId.systemDefault()) = atStartOfDay(zone).toInstant().toEpochMilli()
