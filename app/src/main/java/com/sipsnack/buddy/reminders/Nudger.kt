@@ -1,5 +1,6 @@
 package com.sipsnack.buddy.reminders
 
+import com.sipsnack.buddy.HER_NAME
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -74,7 +75,7 @@ object Nudger {
             Moment.STILL_DELAYING -> Triple(CHANNEL_STILL, "Akrobeto says go and drink your water.", behindText(cupsBehind, "Come on, go back to your bottle."))
             Moment.MEAL_DELAY -> Triple(
                 CHANNEL_MEALS,
-                if (meal == Meal.DINNER) "Dinner time, love." else "Lunch o!",
+                if (meal == Meal.DINNER) "Dinner time, $HER_NAME." else "Lunch o!",
                 "No ${if (meal == Meal.DINNER) "dinner" else "lunch"} logged yet. Eat something good.",
             )
             else -> Triple(CHANNEL_DELAY, "The sea lion has noticed.", behindText(cupsBehind, "Tap for the full side-eye."))

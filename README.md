@@ -36,3 +36,11 @@ Needs JDK 17+ and the Android SDK (platform 35).
 - Meme clips are other people's content, fine for this private app; swap them for your own recordings before sharing it wider.
 - Fonts: Sora and DM Sans, SIL Open Font License (see `licenses/`).
 - Numbers (2 hours, 30 minutes, 3 nudges, meal times) are starting values in `rules/Rules.kt`.
+
+## Releasing a new version
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`, commit and push `main`.
+2. Build, then sign with the same key as every earlier release (keep the key outside the repo):
+   `./gradlew :app:assembleRelease`, then `zipalign -p 4` and `apksigner sign --ks <key>` to make `SipSnack-<version>.apk`.
+3. Add the APK (and optional `notes/<version>.md`) to the `releases` branch and push it.
+4. Push a tag `v<version>` on `main`. The Release workflow publishes a GitHub Release with the APK attached.

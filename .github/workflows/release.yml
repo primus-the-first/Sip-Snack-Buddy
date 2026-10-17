@@ -1,0 +1,40 @@
+# Publishes a GitHub Release for a version tag (v0.1.1 and so on).
+# It attaches the APK already signed and pushed to the `releases` branch, so every
+# release keeps the same signing key and installs as an update on her phone.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to publish, e.g. v0.1.1"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the signed APKs
+        uses: actions/checkout@v4
+        with:
+          ref: releases
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          apk="SipSnack-${version}.apk"
+          if [ ! -f "$apk" ]; then
+            echo "::error::$apk is not on the releases branch. Push the signed APK there first."
+            exit 1
+          fi
+          notes="Sip & Snack Buddy ${version}. Download the APK below on her Android phone and tap it to install."
+          if [ -f "notes/${version}.md" ]; then notes="$(cat "notes/${version}.md")"; fi
+          gh release create "$TAG" "$apk" --repo "$GITHUB_REPOSITORY" --title "Sip & Snack ${version}" --notes "$notes" --latest

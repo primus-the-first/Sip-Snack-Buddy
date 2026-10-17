@@ -1,5 +1,6 @@
 package com.sipsnack.buddy.ui
 
+import com.sipsnack.buddy.HER_NAME
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -177,9 +178,9 @@ private fun timeOf(millis: Long): String =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime().format(DateTimeFormatter.ofPattern("h:mm a"))
 
 private fun greeting(now: LocalTime) = when (now.hour) {
-    in 5..11 -> "Good morning, love"
-    in 12..16 -> "Good afternoon, love"
-    else -> "Good evening, love"
+    in 5..11 -> "Good morning, $HER_NAME"
+    in 12..16 -> "Good afternoon, $HER_NAME"
+    else -> "Good evening, $HER_NAME"
 }
 
 private fun message(cups: Double, goal: Int): String {
