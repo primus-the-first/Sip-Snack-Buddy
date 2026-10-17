@@ -24,6 +24,40 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("nudgesOn", true)
         set(value) = sp.edit().putBoolean("nudgesOn", value).apply()
 
+    /** Whose phone this is: "her", "buddy", or null before the first-run question. */
+    var role: String?
+        get() = sp.getString("role", null)
+        set(value) = sp.edit().putString("role", value).apply()
+
+    /** Her answer to the one-tap share card: null (not asked), "yes" or "no". */
+    var shareAnswer: String?
+        get() = sp.getString("shareAnswer", null)
+        set(value) = sp.edit().putString("shareAnswer", value).apply()
+
+    var shareAskedCount: Int
+        get() = sp.getInt("shareAskedCount", 0)
+        set(value) = sp.edit().putInt("shareAskedCount", value).apply()
+
+    var shareAskedAt: Long
+        get() = sp.getLong("shareAskedAt", 0L)
+        set(value) = sp.edit().putLong("shareAskedAt", value).apply()
+
+    /** The newest cheer or goal already notified on this phone. */
+    var lastCheerSeenAt: Long
+        get() = sp.getLong("lastCheerSeenAt", 0L)
+        set(value) = sp.edit().putLong("lastCheerSeenAt", value).apply()
+
+    var lastGoalNotifiedDay: String?
+        get() = sp.getString("lastGoalNotifiedDay", null)
+        set(value) = sp.edit().putString("lastGoalNotifiedDay", value).apply()
+
+    /** Ask on first open; after a "not now", once more a week later, then never. */
+    fun shouldAskToShare(now: Long = System.currentTimeMillis()): Boolean = when (shareAnswer) {
+        null -> true
+        "no" -> shareAskedCount < 2 && now - shareAskedAt >= 7L * 24 * 60 * 60 * 1000
+        else -> false
+    }
+
     val window: DayWindow
         get() = DayWindow(sp.getInt("wakeMinute", 8 * 60), sp.getInt("sleepMinute", 22 * 60))
 

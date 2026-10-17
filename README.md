@@ -13,7 +13,16 @@ A private Android app that helps her drink 8 cups of water a day and keep up wit
 - Memes: a quick "Let's have it!" sound per cup; video pop-ups at halfway and goal hit.
 - Nudges (8 am to 10 pm, at most 3 a day): the side-eye after 2 hours without water or 2+ cups behind pace; Akrobeto if she ignores it for 30 minutes; lunch and dinner reminders at 2 pm and 8 pm. Tapping a nudge opens its video.
 - Settings: goal, memes on/off, nudges on/off, meme previews, delete all data.
-- Everything stays on her phone: no account, no internet permission.
+- Live sharing (0.2.0): on first open each phone picks who it belongs to. Her phone asks once, "Let Walking Selfie Stick cheer you on?"; one tap and her buddy's phone shows her ring, last sip, meal times (if she allows) and her week, live. She can pick the level, pause or stop (which deletes the shared copy) any time; a "Sharing with ..." label always shows on her Today screen. He can send preset cheers and gets a notification when she hits her goal. Read-only for him.
+- Without sharing, everything stays on her phone. No accounts: each phone signs in anonymously only for sharing.
+
+## Firebase (for live sharing)
+
+1. Firebase console: project `sip-snack-buddy`, Android app `com.sipsnack.buddy`. Put its `google-services.json` in `app/` (kept out of Git; keep a copy safe). Without it the app builds with sharing switched off.
+2. Authentication > Sign-in method > Anonymous: enable.
+3. Firestore Database: create in production mode, then paste `firestore.rules` into the Rules tab and Publish.
+
+Data: one document `pairs/<PAIR_ID>` (her seat, his seat, sharing level, paused, latest cheer) and `pairs/<PAIR_ID>/days/<yyyy-mm-dd>` daily summaries (cups, goal, last sip, and times/kinds of logs at the "with meals" level). No labels or photos leave her phone.
 
 ## Build and install
 
@@ -28,7 +37,7 @@ Needs JDK 17+ and the Android SDK (platform 35).
 ## Layout
 
 - `app/src/main/java/com/sipsnack/buddy/rules/` - pure Kotlin rules (pace, moments, nudges, meals, label mapping). No Android imports, unit-tested in `app/src/test`.
-- `data/` Room log table and settings. `memes/` which clip plays when. `reminders/` notification channels and the 15-minute nudge check. `ui/` Compose screens and the Midnight Blue theme.
+- `sync/` Firestore pairing and sharing. `data/` Room log table and settings. `memes/` which clip plays when. `reminders/` notification channels and the 15-minute nudge check. `ui/` Compose screens and the Midnight Blue theme.
 - `app/src/main/res/raw/` meme clips, named `<moment>_sound.mp3` and `<moment>_video.mp4` (Android ignores extensions here, so names must differ).
 
 ## Notes

@@ -8,3 +8,4 @@ keystore.properties
 *.jks
 *.keystore
 dist/
+app/google-services.json

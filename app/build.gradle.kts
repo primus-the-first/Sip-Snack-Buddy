@@ -7,6 +7,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Live sharing needs app/google-services.json from the Firebase console (kept out of Git).
+// Without it the app still builds; sharing just stays unavailable.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.sipsnack.buddy"
     compileSdk = 35
@@ -15,8 +21,8 @@ android {
         applicationId = "com.sipsnack.buddy"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.2.0"
         // Real phones only: 64-bit ARM and older 32-bit ARM. The on-device labelling model is native code per chip.
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
@@ -80,6 +86,11 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.work.runtime)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
 }

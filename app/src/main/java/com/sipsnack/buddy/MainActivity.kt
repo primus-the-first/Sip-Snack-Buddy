@@ -30,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.sipsnack.buddy.reminders.Nudger
 import com.sipsnack.buddy.rules.Moment
 import com.sipsnack.buddy.ui.AppViewModel
+import com.sipsnack.buddy.ui.BuddyScreen
+import com.sipsnack.buddy.ui.RoleScreen
+import com.sipsnack.buddy.ui.ShareAskCard
+import com.sipsnack.buddy.ui.SharingScreen
 import com.sipsnack.buddy.ui.CameraScreen
 import com.sipsnack.buddy.ui.MemeCard
 import com.sipsnack.buddy.ui.SettingsScreen
@@ -54,14 +58,23 @@ class MainActivity : ComponentActivity() {
                 var screen by rememberSaveable { mutableStateOf("today") }
                 val moment by vm.moment.collectAsState()
                 val toast by vm.toast.collectAsState()
+                val role by vm.role.collectAsState()
+                val askShare by vm.askShare.collectAsState()
 
                 BackHandler(enabled = screen != "today") { screen = "today" }
 
                 Box(Modifier.fillMaxSize().background(Sip.Ink)) {
-                    when (screen) {
-                        "camera" -> CameraScreen(vm, onDone = { screen = "today" })
-                        "settings" -> SettingsScreen(vm, onBack = { screen = "today" })
-                        else -> TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" })
+                    when {
+                        role == null -> RoleScreen(onChoose = { vm.chooseRole(it); screen = "today" })
+                        role == "buddy" -> BuddyScreen(vm)
+                        screen == "camera" -> CameraScreen(vm, onDone = { screen = "today" })
+                        screen == "settings" -> SettingsScreen(vm, onBack = { screen = "today" }, onSharing = { screen = "sharing" })
+                        screen == "sharing" -> SharingScreen(vm, onBack = { screen = "today" })
+                        else -> TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = { screen = "sharing" })
+                    }
+
+                    if (role == "her" && askShare && moment == null) {
+                        ShareAskCard(onYes = vm::acceptShare, onNotNow = vm::declineShare)
                     }
 
                     toast?.let { text ->

@@ -1,5 +1,6 @@
 package com.sipsnack.buddy.ui
 
+import com.sipsnack.buddy.BUDDY_NAME
 import com.sipsnack.buddy.HER_NAME
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -57,13 +58,16 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.ceil
 
 @Composable
-fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit) {
+fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, onSharing: () -> Unit) {
     val logs by vm.todayLogs.collectAsState()
     val goal by vm.goal.collectAsState()
     val cups = Hydration.cups(logs.map { it.toEntry() })
     val now = LocalTime.now()
     val behind = ceil(Hydration.expectedCups(goal, now.hour * 60 + now.minute, vm.prefs.window) - cups).toInt()
     var confirmDelete by remember { mutableStateOf<LogRow?>(null) }
+    val pair by vm.pair.collectAsState()
+    val me by vm.myUid.collectAsState()
+    val sharing = me != null && pair?.ownerUid == me && pair?.sharing == true
 
     Column(
         Modifier
@@ -84,6 +88,23 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit) {
                 onClick = onSettings,
                 modifier = Modifier.size(48.dp).border(1.dp, Sip.Line, CircleShape).background(Sip.Night, CircleShape),
             ) { Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Sip.Cloud) }
+        }
+
+        if (sharing) {
+            // Never hidden: while sharing is on she always sees it, and one tap opens the controls.
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).card().clickable(onClick = onSharing).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.size(10.dp).background(if (pair?.paused == true) Sip.Muted else Sip.Electric, CircleShape))
+                Text(
+                    if (pair?.paused == true) "Sharing paused" else "Sharing with $BUDDY_NAME",
+                    style = SipType.Label,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("Manage", style = SipType.Small.copy(color = Sip.Sky))
+            }
         }
 
         Column(

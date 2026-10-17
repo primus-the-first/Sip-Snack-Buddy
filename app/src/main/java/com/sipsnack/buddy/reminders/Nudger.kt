@@ -1,6 +1,8 @@
 package com.sipsnack.buddy.reminders
 
+import com.sipsnack.buddy.BUDDY_NAME
 import com.sipsnack.buddy.HER_NAME
+import com.sipsnack.buddy.sync.Pairing
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -40,6 +42,7 @@ object Nudger {
     private const val CHANNEL_DELAY = "delay"
     private const val CHANNEL_STILL = "still_delaying"
     private const val CHANNEL_MEALS = "meals"
+    private const val CHANNEL_BUDDY = "buddy"
     private const val WORK = "nudge-check"
 
     /** Each channel carries its meme sound; Android fixes a channel's sound once it exists. */
@@ -59,6 +62,9 @@ object Nudger {
                 },
                 NotificationChannel(CHANNEL_MEALS, "Meal nudges", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "When lunch or dinner hasn't been logged"
+                },
+                NotificationChannel(CHANNEL_BUDDY, "Cheers and wins", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "Cheers from your buddy, and her goal wins on a buddy phone"
                 },
             ),
         )
@@ -97,6 +103,23 @@ object Nudger {
         NotificationManagerCompat.from(context).notify(if (moment == Moment.MEAL_DELAY) 2 else 1, notification)
     }
 
+    /** A plain notification that opens the app: cheers on her phone, goal wins on his. */
+    fun notifyBuddy(context: Context, id: Int, title: String, text: String) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val open = PendingIntent.getActivity(
+            context, 100 + id, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_BUDDY)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF3D8BFF.toInt())
+            .setContentTitle(title)
+            .setContentText(text)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(10 + id, notification)
+    }
+
     private fun behindText(cups: Int, tail: String) =
         if (cups >= 1) "$cups ${if (cups == 1) "cup" else "cups"} behind. $tail" else "No water in a while. $tail"
 }
@@ -104,7 +127,8 @@ object Nudger {
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val prefs = Prefs(applicationContext)
-        if (!prefs.nudgesOn) return Result.success()
+        checkBuddyNews(prefs)
+        if (prefs.role == "buddy" || !prefs.nudgesOn) return Result.success()
 
         val zone = ZoneId.systemDefault()
         val now = ZonedDateTime.now(zone)
@@ -144,6 +168,27 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             }
         }
         return Result.success()
+    }
+}
+
+/** Cheers for her, goal wins for him. Read every 15 minutes; free, no push server needed. */
+private suspend fun NudgeWorker.checkBuddyNews(prefs: Prefs) {
+    if (!Pairing.available || prefs.role == null) return
+    runCatching {
+        val me = Pairing.uid()
+        val pair = Pairing.readPair() ?: return
+        if (prefs.role == "her" && pair.ownerUid == me && pair.cheer != null && pair.cheerAt > prefs.lastCheerSeenAt) {
+            prefs.lastCheerSeenAt = pair.cheerAt
+            Nudger.notifyBuddy(applicationContext, 1, BUDDY_NAME, pair.cheer)
+        }
+        if (prefs.role == "buddy" && pair.buddyUid == me && pair.sharing && !pair.paused) {
+            val today = LocalDate.now().toString()
+            val day = Pairing.readDay(today)?.day ?: return
+            if (day.cups >= day.goal && prefs.lastGoalNotifiedDay != today) {
+                prefs.lastGoalNotifiedDay = today
+                Nudger.notifyBuddy(applicationContext, 2, "$HER_NAME hit ${day.goal} of ${day.goal}!", "Goal done for today. Send her a cheer.")
+            }
+        }
     }
 }
 

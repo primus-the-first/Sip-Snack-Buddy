@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Sip & Snack Buddy: one pair document with an owner seat (her) and a buddy seat.
+// Paste into Firebase console > Firestore Database > Rules, then Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    match /pairs/{pairId} {
+      function isOwner() { return signedIn() && resource.data.ownerUid == request.auth.uid; }
+      function isBuddy() { return signedIn() && resource.data.buddyUid == request.auth.uid; }
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+      allow read: if isOwner() || isBuddy();
+
+      // Either of them can create the pair, taking only their own seat.
+      allow create: if signedIn() && (
+        (request.resource.data.ownerUid == request.auth.uid && request.resource.data.buddyUid == null) ||
+        (request.resource.data.buddyUid == request.auth.uid && request.resource.data.ownerUid == null));
+
+      allow update: if signedIn() && (
+        // She claims the empty owner seat.
+        (resource.data.ownerUid == null && request.resource.data.ownerUid == request.auth.uid
+          && changed().hasOnly(['ownerUid', 'sharing', 'paused', 'level', 'updatedAt'])) ||
+        // The buddy claims the empty buddy seat.
+        (resource.data.buddyUid == null && request.resource.data.buddyUid == request.auth.uid
+          && changed().hasOnly(['buddyUid'])) ||
+        // She changes sharing, removes the buddy, or gives the seat back. She can't hand it to someone else
+        // or write cheers in his name.
+        (isOwner() && !changed().hasAny(['cheer', 'cheerAt'])
+          && (request.resource.data.ownerUid == request.auth.uid || request.resource.data.ownerUid == null)
+          && (request.resource.data.buddyUid == resource.data.buddyUid || request.resource.data.buddyUid == null)) ||
+        // The buddy sends a cheer, or leaves. Nothing else.
+        (isBuddy() && (changed().hasOnly(['cheer', 'cheerAt'])
+          || (changed().hasOnly(['buddyUid']) && request.resource.data.buddyUid == null))));
+
+      allow delete: if false;
+
+      // Her daily summaries. Only she writes them; the buddy reads them only while she shares and isn't paused.
+      match /days/{day} {
+        function pair() { return get(/databases/$(database)/documents/pairs/$(pairId)).data; }
+        allow read: if signedIn() && (pair().ownerUid == request.auth.uid
+          || (pair().buddyUid == request.auth.uid && pair().sharing == true && pair().paused == false));
+        allow write: if signedIn() && pair().ownerUid == request.auth.uid;
+      }
+    }
+  }
+}

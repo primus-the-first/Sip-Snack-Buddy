@@ -41,7 +41,7 @@ import com.sipsnack.buddy.ui.theme.SipType
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) {
     val goal by vm.goal.collectAsState()
     val memesOn by vm.memesOn.collectAsState()
     val nudgesOn by vm.nudgesOn.collectAsState()
@@ -75,6 +75,14 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             Toggle("Delay and meal nudges", "The side-eye, Akrobeto and meal reminders. 8 am to 10 pm, at most 3 a day.", nudgesOn, vm::setNudgesOn)
         }
 
+        if (com.sipsnack.buddy.sync.Pairing.available) {
+            Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Sharing with ${com.sipsnack.buddy.BUDDY_NAME}", style = SipType.Section)
+                Text("Choose what he sees, pause, or stop.", style = SipType.Small)
+                OutlineButton("Open sharing", onClick = onSharing)
+            }
+        }
+
         Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Preview the memes", style = SipType.Section)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -87,6 +95,9 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
         TextButton(onClick = { confirmWipe = true }, modifier = Modifier.heightIn(min = 48.dp)) {
             Text("Delete all my data", style = SipType.Body.copy(color = Sip.Sky))
+        }
+        TextButton(onClick = vm::switchRole, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text("Not ${com.sipsnack.buddy.HER_NAME}'s phone? Switch phone role", style = SipType.Small.copy(color = Sip.Muted))
         }
     }
 
