@@ -78,32 +78,43 @@ object Pairing {
      */
     suspend fun linkHer() {
         val me = uid()
-        try {
-            pair.update(mapOf("ownerUid" to me, "sharing" to true, "updatedAt" to System.currentTimeMillis())).await()
-        } catch (e: FirebaseFirestoreException) {
-            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw denied(e)
-            pair.set(
-                mapOf(
-                    "ownerUid" to me, "buddyUid" to null, "sharing" to true, "paused" to false,
-                    "level" to ShareLevel.WITH_MEALS.name, "cheer" to null, "cheerAt" to 0L, "updatedAt" to System.currentTimeMillis(),
-                ),
-            ).await()
-        }
+        claim(
+            update = mapOf("ownerUid" to me, "sharing" to true, "updatedAt" to System.currentTimeMillis()),
+            create = mapOf(
+                "ownerUid" to me, "buddyUid" to null, "sharing" to true, "paused" to false,
+                "level" to ShareLevel.WITH_MEALS.name, "cheer" to null, "cheerAt" to 0L, "updatedAt" to System.currentTimeMillis(),
+            ),
+        )
     }
 
     /** His phone takes the buddy seat, or confirms it has it. Safe to call every time his app opens. */
     suspend fun linkBuddy() {
         val me = uid()
+        claim(
+            update = mapOf("buddyUid" to me),
+            create = mapOf(
+                "ownerUid" to null, "buddyUid" to me, "sharing" to false, "paused" to false,
+                "level" to ShareLevel.WITH_MEALS.name, "cheer" to null, "cheerAt" to 0L, "updatedAt" to 0L,
+            ),
+        )
+    }
+
+    /**
+     * Takes a seat in the existing pair, or creates the pair if there is none. The rules refuse an update
+     * to a missing document with PERMISSION_DENIED (not NOT_FOUND), so a refusal is answered with a create.
+     * If the pair does exist, the create is refused too (it would overwrite the other seat): then the seat
+     * really is someone else's.
+     */
+    private suspend fun claim(update: Map<String, Any?>, create: Map<String, Any?>) {
         try {
-            pair.update("buddyUid", me).await()
+            pair.update(update).await()
         } catch (e: FirebaseFirestoreException) {
-            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw denied(e)
-            pair.set(
-                mapOf(
-                    "ownerUid" to null, "buddyUid" to me, "sharing" to false, "paused" to false,
-                    "level" to ShareLevel.WITH_MEALS.name, "cheer" to null, "cheerAt" to 0L, "updatedAt" to 0L,
-                ),
-            ).await()
+            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND && e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
+            try {
+                pair.set(create).await()
+            } catch (e2: FirebaseFirestoreException) {
+                throw denied(e2)
+            }
         }
     }
 
