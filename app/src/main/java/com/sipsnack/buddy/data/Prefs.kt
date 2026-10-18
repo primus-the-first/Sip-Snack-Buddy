@@ -94,7 +94,9 @@ class Prefs(context: Context) {
 data class Container(val name: String, val cups: Double)
 
 val defaultContainers = listOf(
-    Container("My bottle", 2.0),
-    Container("Glass", 1.0),
-    Container("Mug", 1.5),
+    Container("Sip", com.sipsnack.buddy.rules.Units.cups(50)),
+    Container("Small cup", com.sipsnack.buddy.rules.Units.cups(100)),
+    Container("Half glass", com.sipsnack.buddy.rules.Units.cups(150)),
+    Container("Glass", com.sipsnack.buddy.rules.Units.cups(250)),
+    Container("Bottle", com.sipsnack.buddy.rules.Units.cups(500)),
 )

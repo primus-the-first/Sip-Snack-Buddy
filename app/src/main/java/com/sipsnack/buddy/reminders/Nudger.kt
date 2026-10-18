@@ -121,7 +121,7 @@ object Nudger {
     }
 
     private fun behindText(cups: Int, tail: String) =
-        if (cups >= 1) "$cups ${if (cups == 1) "cup" else "cups"} behind. $tail" else "No water in a while. $tail"
+        if (cups >= 1) "${com.sipsnack.buddy.rules.Units.ml(cups.toDouble())} behind. $tail" else "No water in a while. $tail"
 }
 
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -186,7 +186,7 @@ private suspend fun NudgeWorker.checkBuddyNews(prefs: Prefs) {
             val day = Pairing.readDay(today)?.day ?: return
             if (day.cups >= day.goal && prefs.lastGoalNotifiedDay != today) {
                 prefs.lastGoalNotifiedDay = today
-                Nudger.notifyBuddy(applicationContext, 2, "$HER_NAME hit ${day.goal} of ${day.goal}!", "Goal done for today. Send her a cheer.")
+                Nudger.notifyBuddy(applicationContext, 2, "$HER_NAME hit her ${com.sipsnack.buddy.rules.Units.ml(day.goal.toDouble())} goal!", "Goal done for today. Send her a cheer.")
             }
         }
     }

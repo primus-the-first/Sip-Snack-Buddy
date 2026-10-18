@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.sipsnack.buddy.HER_NAME
 import com.sipsnack.buddy.rules.Hydration
 import com.sipsnack.buddy.rules.LogKind
+import com.sipsnack.buddy.rules.Units
 import com.sipsnack.buddy.sync.DayDoc
 import com.sipsnack.buddy.sync.Pairing
 import com.sipsnack.buddy.ui.theme.Sip
@@ -68,7 +69,7 @@ import kotlin.math.ceil
 private val cheers = listOf(
     "Let's have it! Keep going.",
     "Proud of you, Mini Boss Battle.",
-    "Water break? Just one cup.",
+    "Water break? Just a few sips.",
     "You're smashing it today.",
 )
 
@@ -172,13 +173,13 @@ private fun TodayCard(doc: DayDoc?) {
     val goal = doc?.day?.goal ?: 8
     val now = LocalTime.now()
     val behind = ceil(Hydration.expectedCups(goal, now.hour * 60 + now.minute, com.sipsnack.buddy.rules.DayWindow()) - cups).toInt()
-    val shown = if (cups % 1.0 == 0.0) cups.toInt().toString() else "%.1f".format(cups)
+    val shown = "%,d".format(Locale.US, Units.mlValue(cups))
     Row(
         Modifier.fillMaxWidth().card().padding(20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Box(Modifier.size(132.dp).semantics { contentDescription = "$shown of $goal cups today" }, contentAlignment = Alignment.Center) {
+        Box(Modifier.size(132.dp).semantics { contentDescription = "$shown of ${Units.ml(goal.toDouble())} today" }, contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 val stroke = 12.dp.toPx()
                 val arc = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
@@ -187,18 +188,18 @@ private fun TodayCard(doc: DayDoc?) {
                 drawArc(Sip.Electric, -90f, 360f * (cups / goal).toFloat().coerceIn(0f, 1f), false, tl, arc, style = Stroke(stroke, cap = StrokeCap.Round))
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("$shown of $goal", style = SipType.Hero.copy(fontSize = 28.sp))
-                Text("cups", style = SipType.Small)
+                Text(shown, style = SipType.Hero.copy(fontSize = 28.sp))
+                Text("of ${Units.ml(goal.toDouble())}", style = SipType.Small)
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             when {
                 cups >= goal -> StatusPill("Goal hit", PillKind.Strong)
-                behind >= 2 -> StatusPill("Behind · $behind cups", PillKind.Behind)
+                behind >= 2 -> StatusPill("Behind · ${Units.ml(behind.toDouble())}", PillKind.Behind)
                 else -> StatusPill("On pace", PillKind.Soft)
             }
-            val left = ceil(goal - cups).toInt()
-            Text(if (left <= 0) "All done today" else "$left ${if (left == 1) "cup" else "cups"} to go", style = SipType.Body.copy(fontWeight = FontWeight.Medium))
+            val left = goal - cups
+            Text(if (left <= 0.0) "All done today" else "${Units.ml(left)} to go", style = SipType.Body.copy(fontWeight = FontWeight.Medium))
             Text(
                 doc?.day?.lastSipMillis?.let { "Last sip ${timeOf(it)}" } ?: "No sips logged yet today",
                 style = SipType.Small,
@@ -221,8 +222,7 @@ private fun HerDay(doc: DayDoc) {
                     modifier = Modifier.weight(1f),
                 )
                 if (e.kind == LogKind.WATER) {
-                    val n = if (e.cups % 1.0 == 0.0) e.cups.toInt().toString() else e.cups.toString()
-                    Text("+$n ${if (e.cups == 1.0) "cup" else "cups"}", style = SipType.Small.copy(color = Sip.Ice))
+                    Text("+${Units.ml(e.cups)}", style = SipType.Small.copy(color = Sip.Ice))
                 }
             }
         }

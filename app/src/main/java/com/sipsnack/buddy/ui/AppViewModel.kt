@@ -263,17 +263,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val reached = Hydration.momentForLog(before, before + cups, goal.value)
-        celebrate(reached)
+        celebrate(reached, cups)
     }
 
-    private fun celebrate(reached: Moment) {
+    private fun celebrate(reached: Moment, cups: Double) {
         if (!memesOn.value) {
             toast.value = if (reached == Moment.GOAL_HIT) "Goal hit. Proud of you!" else "Logged."
             return
         }
         if (reached == Moment.CUP_LOGGED) {
             Memes.forMoment(reached).sound?.let { Memes.playSound(getApplication(), it) }
-            toast.value = "Let's have it! Cup logged."
+            toast.value = "Let's have it! +${com.sipsnack.buddy.rules.Units.ml(cups)}"
         } else {
             moment.value = reached
         }

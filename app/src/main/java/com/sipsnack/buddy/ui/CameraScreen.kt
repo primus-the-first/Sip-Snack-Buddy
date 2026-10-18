@@ -126,7 +126,7 @@ private fun Viewfinder(thinking: Boolean, onClose: () -> Unit, onShot: () -> Uni
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(if (thinking) "Looking..." else "Snap your glass, bottle or plate", style = SipType.Label.copy(color = Sip.Cloud),
+            Text(if (thinking) "Looking..." else "Snap your drink, meal or snack", style = SipType.Label.copy(color = Sip.Cloud),
                 modifier = Modifier.background(Sip.Ink.copy(alpha = 0.75f), RoundedCornerShape(999.dp)).padding(horizontal = 14.dp, vertical = 8.dp))
             Box(
                 Modifier
@@ -166,7 +166,7 @@ private val kindNames = mapOf(
 @Composable
 private fun ConfirmPanel(guess: Guess?, onLog: (LogKind, Double, String) -> Unit, onClose: () -> Unit) {
     var kind by remember { mutableStateOf(guess?.kind) }
-    var container by remember { mutableStateOf(defaultContainers.first()) }
+    var container by remember { mutableStateOf(defaultContainers.first { it.name == "Glass" }) }
 
     Column(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -197,7 +197,7 @@ private fun ConfirmPanel(guess: Guess?, onLog: (LogKind, Double, String) -> Unit
 
         if (kind == LogKind.WATER) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Your usual is ready. Tap another size if it's different.", style = SipType.Small)
+                Text("How much did you drink? Small sips count.", style = SipType.Small)
                 defaultContainers.forEach { c ->
                     Row(
                         Modifier
@@ -249,7 +249,4 @@ private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
     ) { Text(text, style = SipType.Label.copy(color = if (selected) Sip.Ink else Sip.Cloud)) }
 }
 
-private fun cupsLabel(cups: Double): String {
-    val n = if (cups % 1.0 == 0.0) cups.toInt().toString() else cups.toString()
-    return "$n ${if (cups == 1.0) "cup" else "cups"}"
-}
+private fun cupsLabel(cups: Double): String = com.sipsnack.buddy.rules.Units.ml(cups)

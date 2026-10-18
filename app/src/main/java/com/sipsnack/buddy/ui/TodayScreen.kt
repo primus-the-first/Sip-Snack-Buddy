@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.sipsnack.buddy.data.LogRow
 import com.sipsnack.buddy.rules.Hydration
 import com.sipsnack.buddy.rules.LogKind
+import com.sipsnack.buddy.rules.Units
 import com.sipsnack.buddy.ui.theme.Sip
 import com.sipsnack.buddy.ui.theme.SipType
 import java.time.Instant
@@ -118,14 +119,24 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
             Text(message(cups, goal), style = SipType.Body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium))
             when {
                 cups >= goal -> StatusPill("Goal hit", PillKind.Strong)
-                behind >= 2 -> StatusPill("Behind · $behind cups", PillKind.Behind)
+                behind >= 2 -> StatusPill("Behind · ${Units.ml(behind.toDouble())}", PillKind.Behind)
                 else -> StatusPill("On pace", PillKind.Soft)
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PrimaryButton("Snap a sip", onClick = onSnap, modifier = Modifier.weight(1f))
-            OutlineButton("+1 cup", onClick = { vm.log(LogKind.WATER, 1.0, "Water") }, modifier = Modifier.width(120.dp))
+        PrimaryButton("Snap it", onClick = onSnap, modifier = Modifier.fillMaxWidth())
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Quick log", style = SipType.Small)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(50, 100, 250).forEach { ml ->
+                    OutlineButton("+$ml ml", onClick = { vm.log(LogKind.WATER, Units.cups(ml), "Water") }, modifier = Modifier.weight(1f))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlineButton("Meal", onClick = { vm.log(LogKind.MEAL, 0.0, "Meal") }, modifier = Modifier.weight(1f))
+                OutlineButton("Snack", onClick = { vm.log(LogKind.SNACK, 0.0, "Snack") }, modifier = Modifier.weight(1f))
+            }
         }
 
         Column {
@@ -157,9 +168,9 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
 private fun ProgressRing(cups: Double, goal: Int) {
     val target = (cups / goal).toFloat().coerceIn(0f, 1f)
     val progress by animateFloatAsState(target, animationSpec = tween(700), label = "ring")
-    val shown = if (cups % 1.0 == 0.0) cups.toInt().toString() else "%.1f".format(cups)
+    val shown = "%,d".format(java.util.Locale.US, Units.mlValue(cups))
     Box(
-        Modifier.size(240.dp).semantics { contentDescription = "$shown of $goal cups today" },
+        Modifier.size(240.dp).semantics { contentDescription = "$shown of ${Units.ml(goal.toDouble())} today" },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -171,8 +182,8 @@ private fun ProgressRing(cups: Double, goal: Int) {
             drawArc(Sip.Electric, -90f, 360f * progress, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$shown of $goal", style = SipType.Hero)
-            Text("cups today", style = SipType.Small.copy(fontSize = SipType.Body.fontSize))
+            Text(shown, style = SipType.Hero)
+            Text("of ${Units.ml(goal.toDouble())}", style = SipType.Small.copy(fontSize = SipType.Body.fontSize))
         }
     }
 }
@@ -188,7 +199,7 @@ private fun LogLine(row: LogRow, onClick: () -> Unit) {
         Text(timeOf(row.atMillis), style = SipType.Small, modifier = Modifier.width(72.dp))
         Text(row.label, style = SipType.Body, modifier = Modifier.weight(1f))
         val right = when (kind) {
-            LogKind.WATER -> "+${if (row.cups % 1.0 == 0.0) row.cups.toInt() else row.cups} ${if (row.cups == 1.0) "cup" else "cups"}"
+            LogKind.WATER -> "+${Units.ml(row.cups)}"
             LogKind.OTHER_DRINK -> "Drink"
             LogKind.MEAL -> "Meal"
             LogKind.SNACK -> "Snack"
@@ -207,11 +218,11 @@ private fun greeting(now: LocalTime) = when (now.hour) {
 }
 
 private fun message(cups: Double, goal: Int): String {
-    val left = ceil(goal - cups).toInt()
+    val left = goal - cups
     return when {
-        left <= 0 -> "All $goal done. Proud of you!"
-        left == 1 -> "1 cup to go. Nearly there."
-        cups == 0.0 -> "$goal cups today. First sip whenever you're ready."
-        else -> "$left cups to go. You've got this."
+        left <= 0.0 -> "All ${Units.ml(goal.toDouble())} done. Proud of you!"
+        left <= 1.0 -> "${Units.ml(left)} to go. Nearly there."
+        cups == 0.0 -> "${Units.ml(goal.toDouble())} today. Small sips count."
+        else -> "${Units.ml(left)} to go. You've got this."
     }
 }

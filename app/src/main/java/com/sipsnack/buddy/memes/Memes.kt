@@ -23,8 +23,8 @@ object Memes {
         Moment.CUP_LOGGED -> Meme("Let's have it!", "Cup logged.", R.raw.cup_logged_sound, null, "Nice")
         Moment.HALFWAY -> Meme("Halfway there!", "Let's have it, let's have it.", R.raw.halfway_sound, R.raw.halfway_video, "Keep going")
         Moment.GOAL_HIT -> Meme("Goal hit!", "You did it, $HER_NAME. He's dancing for you.", R.raw.goal_hit_sound, R.raw.goal_hit_video, "Back to my day")
-        Moment.DELAY -> Meme("Hmm. We see you.", "The sea lion has noticed. Time for some water.", R.raw.delay_sound, R.raw.delay_video, "Okay okay, log a cup")
-        Moment.STILL_DELAYING -> Meme("Go and sit down...", "...with your water. Akrobeto is not playing.", R.raw.still_delaying_sound, R.raw.still_delaying_video, "Fine, log a cup")
+        Moment.DELAY -> Meme("Hmm. We see you.", "The sea lion has noticed. Time for some water.", R.raw.delay_sound, R.raw.delay_video, "Okay okay, log a sip")
+        Moment.STILL_DELAYING -> Meme("Go and sit down...", "...with your water. Akrobeto is not playing.", R.raw.still_delaying_sound, R.raw.still_delaying_video, "Fine, log a sip")
         Moment.MEAL_DELAY -> Meme("Food first, $HER_NAME.", "You haven't logged a meal yet. Eat something good.", null, null, "On it")
     }
 

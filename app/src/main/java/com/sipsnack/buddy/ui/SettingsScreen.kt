@@ -64,10 +64,10 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
             Text("Daily water goal", style = SipType.Section)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlineButton("−", onClick = { vm.setGoal(goal - 1) })
-                Text("$goal cups", style = SipType.Title)
+                Text(com.sipsnack.buddy.rules.Units.ml(goal.toDouble()), style = SipType.Title)
                 OutlineButton("+", onClick = { vm.setGoal(goal + 1) })
             }
-            Text("About ${"%.1f".format(goal * 0.237)} L. Check with your doctor before changing it.", style = SipType.Small)
+            Text("Changes in steps of 250 ml. Check with your doctor before changing it.", style = SipType.Small)
         }
 
         Column(Modifier.fillMaxWidth().card().padding(horizontal = 20.dp, vertical = 8.dp)) {
