@@ -1,5 +1,5 @@
 # Sip & Snack Buddy downloads
 
-Latest: [SipSnack-0.2.3.apk](SipSnack-0.2.3.apk) (25 MB)
+Latest: [SipSnack-0.2.4.apk](SipSnack-0.2.4.apk) (25 MB)
 
 Open this on the Android phone, tap the APK, then View raw / Download. Allow installs from your browser when Android asks.
