@@ -80,6 +80,7 @@ fun BuddyScreen(vm: AppViewModel) {
     val me by vm.myUid.collectAsState()
     val week by vm.week.collectAsState()
     val problem by vm.linkProblem.collectAsState()
+    val waiting by vm.waitingForHer.collectAsState()
     var menu by remember { mutableStateOf(false) }
     var cheering by remember { mutableStateOf(false) }
 
@@ -119,6 +120,7 @@ fun BuddyScreen(vm: AppViewModel) {
             pair?.paused == true -> Message("$HER_NAME has paused sharing for now. It'll come back when she turns it on.")
             else -> {
                 TodayCard(todayDoc)
+                if (pair?.allowAdds != false) LogForHer(vm, waiting.size)
                 if (todayDoc != null && todayDoc.day.events.isNotEmpty()) HerDay(todayDoc)
                 if (week.isNotEmpty()) WeekCard(week)
                 PrimaryButton("Send a cheer", onClick = { cheering = true }, modifier = Modifier.fillMaxWidth())
@@ -159,6 +161,31 @@ fun BuddyScreen(vm: AppViewModel) {
             dismissButton = { TextButton(onClick = { menu = false }) { Text("Close", color = Sip.Muted) } },
             containerColor = Sip.Deep,
         )
+    }
+}
+
+/** When they're together: he taps what she just drank or ate, and it lands in her day. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun LogForHer(vm: AppViewModel, waiting: Int) {
+    Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Log for her", style = SipType.Section)
+        Text("Saw her drink or eat? Add it to her day. It shows as yours on her phone.", style = SipType.Small)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(50, 100, 250).forEach { ml ->
+                OutlineButton("+$ml ml", onClick = { vm.logForHer(LogKind.WATER, ml) }, modifier = Modifier.weight(1f))
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlineButton("Meal", onClick = { vm.logForHer(LogKind.MEAL, 0) }, modifier = Modifier.weight(1f))
+            OutlineButton("Snack", onClick = { vm.logForHer(LogKind.SNACK, 0) }, modifier = Modifier.weight(1f))
+        }
+        if (waiting > 0) {
+            Text(
+                "$waiting waiting to reach her phone. It syncs when her app opens, or within about 15 minutes.",
+                style = SipType.Small.copy(color = Sip.Ice),
+            )
+        }
     }
 }
 

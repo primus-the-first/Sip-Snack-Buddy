@@ -12,6 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -31,6 +34,7 @@ import com.sipsnack.buddy.reminders.Nudger
 import com.sipsnack.buddy.rules.Moment
 import com.sipsnack.buddy.ui.AppViewModel
 import com.sipsnack.buddy.ui.BuddyScreen
+import com.sipsnack.buddy.ui.BuddyTabs
 import com.sipsnack.buddy.ui.RoleScreen
 import com.sipsnack.buddy.ui.ShareAskCard
 import com.sipsnack.buddy.ui.SharingScreen
@@ -61,12 +65,19 @@ class MainActivity : ComponentActivity() {
                 val role by vm.role.collectAsState()
                 val askShare by vm.askShare.collectAsState()
 
-                BackHandler(enabled = screen != "today") { screen = "today" }
+                BackHandler(enabled = screen in listOf("camera", "settings", "sharing")) { screen = "today" }
 
                 Box(Modifier.fillMaxSize().background(Sip.Ink)) {
                     when {
-                        role == null -> RoleScreen(onChoose = { vm.chooseRole(it); screen = "today" })
-                        role == "buddy" -> BuddyScreen(vm)
+                        role == null -> RoleScreen(onChoose = { vm.chooseRole(it); screen = if (it == "buddy") "her" else "today" })
+                        role == "buddy" && screen == "camera" -> CameraScreen(vm, onDone = { screen = "today" })
+                        role == "buddy" && screen == "settings" -> SettingsScreen(vm, onBack = { screen = "today" }, onSharing = {})
+                        role == "buddy" -> BuddyTabs(current = if (screen == "today") "today" else "her", onPick = { screen = it }) { inner ->
+                            Box(inner.consumeWindowInsets(WindowInsets.navigationBars)) {
+                                if (screen == "today") TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = {})
+                                else BuddyScreen(vm)
+                            }
+                        }
                         screen == "camera" -> CameraScreen(vm, onDone = { screen = "today" })
                         screen == "settings" -> SettingsScreen(vm, onBack = { screen = "today" }, onSharing = { screen = "sharing" })
                         screen == "sharing" -> SharingScreen(vm, onBack = { screen = "today" })
@@ -94,6 +105,7 @@ class MainActivity : ComponentActivity() {
                     moment?.let { m ->
                         MemeCard(
                             moment = m,
+                            name = vm.myName,
                             onAction = {
                                 vm.dismissMoment()
                                 if (m == Moment.DELAY || m == Moment.STILL_DELAYING) screen = "camera"

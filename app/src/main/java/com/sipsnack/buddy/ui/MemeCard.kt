@@ -38,8 +38,8 @@ import com.sipsnack.buddy.ui.theme.SipType
 
 /** The pop-up for a big moment: the meme video with its sound, then a line of warm copy. */
 @Composable
-fun MemeCard(moment: Moment, onAction: () -> Unit, onDismiss: () -> Unit) {
-    val meme = Memes.forMoment(moment)
+fun MemeCard(moment: Moment, name: String, onAction: () -> Unit, onDismiss: () -> Unit) {
+    val meme = Memes.forMoment(moment, name)
     Box(
         Modifier
             .fillMaxSize()

@@ -42,6 +42,11 @@ class Prefs(context: Context) {
         get() = sp.getLong("shareAskedAt", 0L)
         set(value) = sp.edit().putLong("shareAskedAt", value).apply()
 
+    /** Ids of logs her buddy added that this phone already took into her day (the last 200). */
+    var importedIds: Set<String>
+        get() = sp.getStringSet("importedIds", emptySet())!!
+        set(value) = sp.edit().putStringSet("importedIds", value.toList().takeLast(200).toSet()).apply()
+
     /** The newest cheer or goal already notified on this phone. */
     var lastCheerSeenAt: Long
         get() = sp.getLong("lastCheerSeenAt", 0L)

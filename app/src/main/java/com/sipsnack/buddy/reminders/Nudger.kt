@@ -3,6 +3,8 @@ package com.sipsnack.buddy.reminders
 import com.sipsnack.buddy.BUDDY_NAME
 import com.sipsnack.buddy.HER_NAME
 import com.sipsnack.buddy.sync.Pairing
+import com.sipsnack.buddy.sync.Importer
+import com.sipsnack.buddy.rules.Sharing
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -75,13 +77,13 @@ object Nudger {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
-    fun notify(context: Context, moment: Moment, cupsBehind: Int, meal: Meal? = null) {
+    fun notify(context: Context, moment: Moment, cupsBehind: Int, meal: Meal? = null, name: String = HER_NAME) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val (channel, title, text) = when (moment) {
             Moment.STILL_DELAYING -> Triple(CHANNEL_STILL, "Akrobeto says go and drink your water.", behindText(cupsBehind, "Come on, go back to your bottle."))
             Moment.MEAL_DELAY -> Triple(
                 CHANNEL_MEALS,
-                if (meal == Meal.DINNER) "Dinner time, $HER_NAME." else "Lunch o!",
+                if (meal == Meal.DINNER) "Dinner time, $name." else "Lunch o!",
                 "No ${if (meal == Meal.DINNER) "dinner" else "lunch"} logged yet. Eat something good.",
             )
             else -> Triple(CHANNEL_DELAY, "The sea lion has noticed.", behindText(cupsBehind, "Tap for the full side-eye."))
@@ -128,7 +130,8 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     override suspend fun doWork(): Result {
         val prefs = Prefs(applicationContext)
         checkBuddyNews(prefs)
-        if (prefs.role == "buddy" || !prefs.nudgesOn) return Result.success()
+        takeHisLogs(prefs)
+        if (!prefs.nudgesOn) return Result.success()
 
         val zone = ZoneId.systemDefault()
         val now = ZonedDateTime.now(zone)
@@ -163,7 +166,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(it.atMillis), zone).let { t -> t.hour * 60 + t.minute }
             }
             Meals.missing(minuteOfDay, mealMinutes, prefs.mealsNudged(today))?.let { meal ->
-                Nudger.notify(applicationContext, Moment.MEAL_DELAY, 0, meal)
+                Nudger.notify(applicationContext, Moment.MEAL_DELAY, 0, meal, if (prefs.role == "buddy") BUDDY_NAME else HER_NAME)
                 prefs.markMealNudged(meal, today)
             }
         }
@@ -189,6 +192,21 @@ private suspend fun NudgeWorker.checkBuddyNews(prefs: Prefs) {
                 Nudger.notifyBuddy(applicationContext, 2, "$HER_NAME hit her ${com.sipsnack.buddy.rules.Units.ml(day.goal.toDouble())} goal!", "Goal done for today. Send her a cheer.")
             }
         }
+    }
+}
+
+/** On her phone, logs her buddy added while her app was closed land in her day and the shared summary. */
+private suspend fun NudgeWorker.takeHisLogs(prefs: Prefs) {
+    if (!Pairing.available || prefs.role != "her") return
+    runCatching {
+        val me = Pairing.uid()
+        val pair = Pairing.readPair() ?: return
+        if (pair.ownerUid != me || !pair.sharing) return
+        if (Importer.take(applicationContext, Pairing.readAdded()) == 0 || pair.paused) return
+        val today = LocalDate.now()
+        val entries = AppDb.get(applicationContext).logs()
+            .betweenNow(today.startMillis(), today.plusDays(1).startMillis()).map { it.toEntry() }
+        Pairing.pushDay(today.toString(), Sharing.summarise(entries, prefs.goal, pair.level))
     }
 }
 

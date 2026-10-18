@@ -83,7 +83,7 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), style = SipType.Small)
-                Text(greeting(now), style = SipType.Title)
+                Text(greeting(now, vm.myName), style = SipType.Title)
             }
             IconButton(
                 onClick = onSettings,
@@ -211,10 +211,10 @@ private fun LogLine(row: LogRow, onClick: () -> Unit) {
 private fun timeOf(millis: Long): String =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime().format(DateTimeFormatter.ofPattern("h:mm a"))
 
-private fun greeting(now: LocalTime) = when (now.hour) {
-    in 5..11 -> "Good morning, $HER_NAME"
-    in 12..16 -> "Good afternoon, $HER_NAME"
-    else -> "Good evening, $HER_NAME"
+private fun greeting(now: LocalTime, name: String) = when (now.hour) {
+    in 5..11 -> "Good morning, $name"
+    in 12..16 -> "Good afternoon, $name"
+    else -> "Good evening, $name"
 }
 
 private fun message(cups: Double, goal: Int): String {

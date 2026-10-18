@@ -31,7 +31,12 @@ data class PairState(
     val level: ShareLevel,
     val cheer: String?,
     val cheerAt: Long,
+    /** Whether she lets her buddy add logs to her day. On unless she turns it off. */
+    val allowAdds: Boolean,
 )
+
+/** A log her buddy added for her, waiting for her phone to take it into her day. */
+data class AddedLog(val id: String, val kind: LogKind, val cups: Double, val atMillis: Long)
 
 data class DayDoc(val date: String, val day: SharedDay, val updatedAt: Long)
 
@@ -56,6 +61,7 @@ object Pairing {
     private val db get() = FirebaseFirestore.getInstance()
     private val pair get() = db.collection("pairs").document(PAIR_ID)
     private val days get() = pair.collection("days")
+    private val added get() = pair.collection("added")
 
     private val signIn = Mutex()
 
@@ -157,6 +163,38 @@ object Pairing {
         ).await()
     }
 
+    /** His phone adds a log to her day. Her phone takes it in (and deletes it here) when it next syncs. */
+    suspend fun addForHer(kind: LogKind, cups: Double) {
+        uid()
+        added.add(mapOf("kind" to kind.name, "cups" to cups, "atMillis" to System.currentTimeMillis())).await()
+    }
+
+    suspend fun readAdded(): List<AddedLog> = added.get().await().documents.mapNotNull { it.toAdded() }
+
+    suspend fun deleteAdded(id: String) {
+        added.document(id).delete().await()
+    }
+
+    /** Logs waiting in the shared pair: on his phone, the ones not yet taken in; on hers, the ones to take in. */
+    fun observeAdded(): Flow<List<AddedLog>> {
+        if (!available) return flowOf(emptyList())
+        return callbackFlow {
+            uid()
+            val reg = added.addSnapshotListener { snap, err ->
+                if (err != null) close(err) else trySend(snap?.documents?.mapNotNull { it.toAdded() }.orEmpty())
+            }
+            awaitClose { reg.remove() }
+        }.retryWhen { _, attempt ->
+            emit(emptyList())
+            delay(minOf(30_000L, 3_000L * (attempt + 1)))
+            true
+        }
+    }
+
+    suspend fun setAllowAdds(allow: Boolean) {
+        pair.update(mapOf("allowAdds" to allow, "updatedAt" to System.currentTimeMillis())).await()
+    }
+
     suspend fun sendCheer(text: String) {
         pair.update(mapOf("cheer" to text, "cheerAt" to System.currentTimeMillis())).await()
     }
@@ -207,7 +245,13 @@ object Pairing {
             level = runCatching { ShareLevel.valueOf(getString("level") ?: "") }.getOrDefault(ShareLevel.WITH_MEALS),
             cheer = getString("cheer"),
             cheerAt = getLong("cheerAt") ?: 0L,
+            allowAdds = getBoolean("allowAdds") ?: true,
         )
+    }
+
+    private fun DocumentSnapshot.toAdded(): AddedLog? {
+        val kind = runCatching { LogKind.valueOf(getString("kind") ?: "") }.getOrNull() ?: return null
+        return AddedLog(id, kind, getDouble("cups") ?: 0.0, getLong("atMillis") ?: return null)
     }
 
     @Suppress("UNCHECKED_CAST")

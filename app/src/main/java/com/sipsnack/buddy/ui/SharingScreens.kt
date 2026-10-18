@@ -168,6 +168,22 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
             )
         }
 
+        Row(
+            Modifier.fillMaxWidth().card().heightIn(min = 64.dp)
+                .toggleable(pair?.allowAdds != false, role = Role.Switch, onValueChange = vm::setAllowAdds).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Let him log for you", style = SipType.BodyStrong)
+                Text("When you're together, $BUDDY_NAME can add sips and meals to your day. They show \"by $BUDDY_NAME\" and you can remove them.", style = SipType.Small)
+            }
+            Switch(
+                checked = pair?.allowAdds != false,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(checkedTrackColor = Sip.Electric, checkedThumbColor = Sip.Ink, uncheckedTrackColor = Sip.Deep, uncheckedThumbColor = Sip.Muted, uncheckedBorderColor = Sip.Line),
+            )
+        }
+
         TextButton(onClick = { confirmStop = true }, modifier = Modifier.heightIn(min = 48.dp)) {
             Text("Stop sharing and delete the shared copy", style = SipType.Body.copy(color = Sip.Sky))
         }

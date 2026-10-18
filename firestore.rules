@@ -36,6 +36,19 @@ service cloud.firestore {
 
       allow delete: if false;
 
+      // Logs her buddy adds for her, while she shares, isn't paused and allows it. Her phone takes them
+      // into her own log and deletes them here; he can delete his own before that (undo).
+      match /added/{entry} {
+        function pair() { return get(/databases/$(database)/documents/pairs/$(pairId)).data; }
+        allow create: if signedIn() && pair().buddyUid == request.auth.uid
+          && pair().sharing == true && pair().paused == false && pair().get('allowAdds', true) == true
+          && request.resource.data.keys().hasOnly(['kind', 'cups', 'atMillis'])
+          && request.resource.data.kind in ['WATER', 'OTHER_DRINK', 'MEAL', 'SNACK']
+          && request.resource.data.cups is number && request.resource.data.cups >= 0 && request.resource.data.cups <= 4
+          && request.resource.data.atMillis is int;
+        allow read, delete: if signedIn() && (pair().ownerUid == request.auth.uid || pair().buddyUid == request.auth.uid);
+      }
+
       // Her daily summaries. Only she writes them; the buddy reads them only while she shares and isn't paused.
       match /days/{day} {
         function pair() { return get(/databases/$(database)/documents/pairs/$(pairId)).data; }

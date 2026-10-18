@@ -20,6 +20,10 @@ import com.sipsnack.buddy.sync.Pairing
 import com.sipsnack.buddy.sync.reason
 import kotlinx.coroutines.Job
 import com.sipsnack.buddy.update.Release
+import com.sipsnack.buddy.HER_NAME
+import com.sipsnack.buddy.rules.Units
+import com.sipsnack.buddy.sync.AddedLog
+import com.sipsnack.buddy.sync.Importer
 import com.sipsnack.buddy.update.Updater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -77,6 +81,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val myUid = MutableStateFlow<String?>(null)
 
+    /** Who this phone's own Today screen belongs to. */
+    val myName: String get() = if (role.value == "buddy") BUDDY_NAME else HER_NAME
+
+    /** On his phone: logs he added for her that her phone hasn't taken in yet. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val waitingForHer: StateFlow<List<AddedLog>> = combine(role, pair, myUid) { r, p, me ->
+        r == "buddy" && me != null && p?.buddyUid == me
+    }.distinctUntilChanged()
+        .flatMapLatest { mine -> if (mine) Pairing.observeAdded() else flow { emit(emptyList()) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     /** A newer release on GitHub, offered as a one-tap update. */
     val update = MutableStateFlow<Release?>(null)
     val updating = MutableStateFlow(false)
@@ -97,7 +112,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (Pairing.available) viewModelScope.launch { myUid.value = runCatching { Pairing.uid() }.getOrNull() }
         syncHerDay()
         watchCheers()
+        takeHisLogs()
         autoLink()
+    }
+
+    /** On her phone, logs her buddy added land in her day while the app is open (the worker covers the rest). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun takeHisLogs() {
+        viewModelScope.launch {
+            combine(role, pair, myUid) { r, p, me -> r == "her" && me != null && p?.ownerUid == me && p.sharing }
+                .distinctUntilChanged()
+                .flatMapLatest { mine -> if (mine) Pairing.observeAdded() else flow { emit(emptyList()) } }
+                .collect { waiting ->
+                    val taken = Importer.take(getApplication(), waiting)
+                    if (taken > 0) {
+                        val total = waiting.filter { it.kind == LogKind.WATER }.sumOf { it.cups }
+                        toast.value = if (total > 0) "$BUDDY_NAME added ${Units.ml(total)} for you." else "$BUDDY_NAME added a log for you."
+                    }
+                }
+        }
+    }
+
+    /** His tap on "Log for her": lands in her day once her phone syncs. */
+    fun logForHer(kind: LogKind, ml: Int) {
+        viewModelScope.launch {
+            runCatching { Pairing.addForHer(kind, Units.cups(ml)) }
+                .onSuccess { toast.value = if (kind == LogKind.WATER) "Added ${ml} ml for $HER_NAME." else "Added a ${kind.name.lowercase()} for $HER_NAME." }
+                .onFailure { toast.value = "Couldn't add it: ${it.reason()}." }
+        }
+    }
+
+    fun setAllowAdds(allow: Boolean) {
+        viewModelScope.launch { runCatching { Pairing.setAllowAdds(allow) } }
     }
 
     /**

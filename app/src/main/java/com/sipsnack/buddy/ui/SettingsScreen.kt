@@ -75,7 +75,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
             Toggle("Delay and meal nudges", "The side-eye, Akrobeto and meal reminders. 8 am to 10 pm, at most 3 a day.", nudgesOn, vm::setNudgesOn)
         }
 
-        if (com.sipsnack.buddy.sync.Pairing.available) {
+        if (com.sipsnack.buddy.sync.Pairing.available && vm.role.value == "her") {
             Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Sharing with ${com.sipsnack.buddy.BUDDY_NAME}", style = SipType.Section)
                 Text("Choose what he sees, pause, or stop.", style = SipType.Small)
@@ -97,7 +97,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
             Text("Delete all my data", style = SipType.Body.copy(color = Sip.Sky))
         }
         TextButton(onClick = vm::switchRole, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text("Not ${com.sipsnack.buddy.HER_NAME}'s phone? Switch phone role", style = SipType.Small.copy(color = Sip.Muted))
+            Text("Wrong phone role? Switch phone role", style = SipType.Small.copy(color = Sip.Muted))
         }
     }
 
