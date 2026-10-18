@@ -104,6 +104,8 @@ fun BuddyScreen(vm: AppViewModel) {
             ) { Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Sip.Cloud) }
         }
 
+        UpdateCard(vm)
+
         when {
             !Pairing.available -> Message("Sharing isn't set up in this version of the app.")
             problem != null && !linked -> Message(

@@ -19,6 +19,8 @@ import com.sipsnack.buddy.sync.PairState
 import com.sipsnack.buddy.sync.Pairing
 import com.sipsnack.buddy.sync.reason
 import kotlinx.coroutines.Job
+import com.sipsnack.buddy.update.Release
+import com.sipsnack.buddy.update.Updater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -75,6 +77,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val myUid = MutableStateFlow<String?>(null)
 
+    /** A newer release on GitHub, offered as a one-tap update. */
+    val update = MutableStateFlow<Release?>(null)
+    val updating = MutableStateFlow(false)
+    private var lastUpdateCheck = 0L
+
     /** Why this phone isn't linked yet, in plain words; null when linked or not trying. */
     val linkProblem = MutableStateFlow<String?>(null)
     private var linking: Job? = null
@@ -98,6 +105,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * seat: his always, hers once she has said yes. Retries with growing gaps; a seat held by another
      * install stops the retries and says so.
      */
+    /** Checks GitHub for a newer release at most once an hour while the app is in use. */
+    fun checkForUpdate() {
+        val now = System.currentTimeMillis()
+        if (now - lastUpdateCheck < 60 * 60 * 1000L) return
+        lastUpdateCheck = now
+        viewModelScope.launch { update.value = Updater.check() }
+    }
+
+    fun installUpdate() {
+        val release = update.value ?: return
+        val app = getApplication<Application>()
+        if (!Updater.canInstall(app)) {
+            toast.value = "Allow Sip & Snack to install updates, then tap Update again."
+            Updater.openInstallPermission(app)
+            return
+        }
+        updating.value = true
+        viewModelScope.launch {
+            val ok = runCatching { Updater.downloadAndInstall(app, release) }.getOrDefault(false)
+            updating.value = false
+            if (!ok) toast.value = "The download didn't finish. Check your internet and tap Update again."
+        }
+    }
+
     fun autoLink() {
         if (!Pairing.available) return
         val wants = when (role.value) {

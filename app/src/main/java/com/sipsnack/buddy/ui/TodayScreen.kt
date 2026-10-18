@@ -90,6 +90,8 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
             ) { Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Sip.Cloud) }
         }
 
+        UpdateCard(vm)
+
         if (sharing) {
             // Never hidden: while sharing is on she always sees it, and one tap opens the controls.
             Row(

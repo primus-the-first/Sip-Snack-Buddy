@@ -14,6 +14,7 @@ A private Android app that helps her drink 8 cups of water a day and keep up wit
 - Nudges (8 am to 10 pm, at most 3 a day): the side-eye after 2 hours without water or 2+ cups behind pace; Akrobeto if she ignores it for 30 minutes; lunch and dinner reminders at 2 pm and 8 pm. Tapping a nudge opens its video.
 - Settings: goal, memes on/off, nudges on/off, meme previews, delete all data.
 - Live sharing (0.2.0): on first open each phone picks who it belongs to. Her phone asks once, "Let Walking Selfie Stick cheer you on?"; one tap and her buddy's phone shows her ring, last sip, meal times (if she allows) and her week, live. She can pick the level, pause or stop (which deletes the shared copy) any time; a "Sharing with ..." label always shows on her Today screen. He can send preset cheers and gets a notification when she hits her goal. Read-only for him.
+- One-tap updates (0.2.2): the app checks this repo's public GitHub Releases when it opens; a newer version shows an Update card, downloads, and Android asks to install. Releases must keep the same signing key.
 - Without sharing, everything stays on her phone. No accounts: each phone signs in anonymously only for sharing.
 
 ## Firebase (for live sharing)
