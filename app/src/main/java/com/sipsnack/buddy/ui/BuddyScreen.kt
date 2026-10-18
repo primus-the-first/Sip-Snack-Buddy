@@ -78,6 +78,7 @@ fun BuddyScreen(vm: AppViewModel) {
     val pair by vm.pair.collectAsState()
     val me by vm.myUid.collectAsState()
     val week by vm.week.collectAsState()
+    val problem by vm.linkProblem.collectAsState()
     var menu by remember { mutableStateOf(false) }
     var cheering by remember { mutableStateOf(false) }
 
@@ -105,7 +106,12 @@ fun BuddyScreen(vm: AppViewModel) {
 
         when {
             !Pairing.available -> Message("Sharing isn't set up in this version of the app.")
-            pair == null || !linked -> Message("Linking to $HER_NAME's app... If this stays, check your internet.")
+            problem != null && !linked -> Message(
+                if (problem!!.contains("older install"))
+                    "Can't link yet: $problem. If this stays, delete the pairs document in the Firebase console and reopen this app."
+                else "Can't link yet: $problem. Retrying by itself."
+            )
+            pair == null || !linked -> Message("Linking to $HER_NAME's app...")
             pair?.ownerUid == null || pair?.sharing != true -> Message("Waiting for $HER_NAME to turn on sharing. Her app asks her the first time she opens it.")
             pair?.paused == true -> Message("$HER_NAME has paused sharing for now. It'll come back when she turns it on.")
             else -> {

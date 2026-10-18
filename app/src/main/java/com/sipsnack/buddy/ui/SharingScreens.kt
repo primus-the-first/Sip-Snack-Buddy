@@ -99,6 +99,7 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
     val sharing = mine && pair?.sharing == true
     val paused = pair?.paused == true
     var confirmStop by remember { mutableStateOf(false) }
+    val problem by vm.linkProblem.collectAsState()
 
     Column(
         Modifier.fillMaxSize().background(Sip.Ink).statusBarsPadding().navigationBarsPadding()
@@ -140,6 +141,7 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
         }
 
         if (!sharing) {
+            problem?.let { Text("Not connected yet: $it. It keeps trying by itself.", style = SipType.Small) }
             PrimaryButton("Share with $BUDDY_NAME", onClick = vm::startSharing, modifier = Modifier.fillMaxWidth())
             return@Column
         }

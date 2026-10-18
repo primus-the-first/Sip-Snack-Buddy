@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 /** The shared pair as either phone sees it. */
@@ -33,7 +35,19 @@ data class PairState(
 
 data class DayDoc(val date: String, val day: SharedDay, val updatedAt: Long)
 
+/** "taken": the seat belongs to another install. */
 class PairingException(message: String) : Exception(message)
+
+/** Plain words for a failed Firestore call, shown so problems can be diagnosed from a screenshot. */
+fun Throwable.reason(): String = when (this) {
+    is PairingException -> "the database refused the seat (it may belong to an older install of the app)"
+    is FirebaseFirestoreException -> when (code) {
+        FirebaseFirestoreException.Code.UNAVAILABLE -> "no internet connection"
+        FirebaseFirestoreException.Code.PERMISSION_DENIED -> "the database refused it (permission denied)"
+        else -> code.name.lowercase().replace('_', ' ')
+    }
+    else -> message ?: javaClass.simpleName
+}
 
 /** Talks to Firestore for live sharing. Everything here is a no-op when Firebase isn't configured. */
 object Pairing {
@@ -43,34 +57,47 @@ object Pairing {
     private val pair get() = db.collection("pairs").document(PAIR_ID)
     private val days get() = pair.collection("days")
 
-    /** Anonymous sign-in: no accounts, just a stable id per install. */
-    suspend fun uid(): String {
+    private val signIn = Mutex()
+
+    /**
+     * Anonymous sign-in: no accounts, just a stable id per install. Only one sign-in may run at a time:
+     * several at once each create an account, and the phone ends up writing as one id while claiming
+     * its seat as another, which the rules (rightly) refuse.
+     */
+    suspend fun uid(): String = signIn.withLock {
         val auth = FirebaseAuth.getInstance()
-        return auth.currentUser?.uid ?: auth.signInAnonymously().await().user!!.uid
+        val user = auth.currentUser ?: auth.signInAnonymously().await().user!!
+        // Have the sign-in pass in hand before any write, so the first write can't go out without it.
+        user.getIdToken(false).await()
+        user.uid
     }
 
-    /** Her phone takes the owner seat and turns sharing on. */
-    suspend fun claimHer(level: ShareLevel) {
+    /**
+     * Her phone takes the owner seat (or confirms it has it) with sharing on. Leaves pause and level as
+     * they are, so it is safe to call every time her app opens.
+     */
+    suspend fun linkHer() {
         val me = uid()
-        val fields = mapOf(
-            "ownerUid" to me, "sharing" to true, "paused" to false,
-            "level" to level.name, "updatedAt" to System.currentTimeMillis(),
-        )
         try {
-            pair.update(fields).await()
+            pair.update(mapOf("ownerUid" to me, "sharing" to true, "updatedAt" to System.currentTimeMillis())).await()
         } catch (e: FirebaseFirestoreException) {
-            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw takenOr(e, "owner")
-            pair.set(fields + mapOf("buddyUid" to null, "cheer" to null, "cheerAt" to 0L)).await()
+            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw denied(e)
+            pair.set(
+                mapOf(
+                    "ownerUid" to me, "buddyUid" to null, "sharing" to true, "paused" to false,
+                    "level" to ShareLevel.WITH_MEALS.name, "cheer" to null, "cheerAt" to 0L, "updatedAt" to System.currentTimeMillis(),
+                ),
+            ).await()
         }
     }
 
-    /** His phone takes the buddy seat. */
-    suspend fun claimBuddy() {
+    /** His phone takes the buddy seat, or confirms it has it. Safe to call every time his app opens. */
+    suspend fun linkBuddy() {
         val me = uid()
         try {
             pair.update("buddyUid", me).await()
         } catch (e: FirebaseFirestoreException) {
-            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw takenOr(e, "buddy")
+            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw denied(e)
             pair.set(
                 mapOf(
                     "ownerUid" to null, "buddyUid" to me, "sharing" to false, "paused" to false,
@@ -80,14 +107,9 @@ object Pairing {
         }
     }
 
-    private suspend fun takenOr(e: FirebaseFirestoreException, seat: String): Exception {
-        if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) return e
-        // Denied either because the seat is someone else's, or because it's already ours.
-        val mine = runCatching { pair.get().await() }.getOrNull()?.let {
-            it.getString(if (seat == "owner") "ownerUid" else "buddyUid") == uid()
-        } ?: false
-        return if (mine) PairingException("already") else PairingException("taken")
-    }
+    /** A refused seat claim means the seat is someone else's; anything else is passed on as it is. */
+    private fun denied(e: FirebaseFirestoreException): Exception =
+        if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) PairingException("taken") else e
 
     suspend fun setSharing(sharing: Boolean, paused: Boolean, level: ShareLevel) {
         pair.update(mapOf("sharing" to sharing, "paused" to paused, "level" to level.name, "updatedAt" to System.currentTimeMillis())).await()
@@ -104,13 +126,12 @@ object Pairing {
         setSharing(sharing = false, paused = false, level = ShareLevel.WITH_MEALS)
     }
 
-    /** Frees her seat, for a phone that picked the wrong role. */
-    suspend fun releaseOwner() {
-        pair.update("ownerUid", null).await()
-    }
-
-    suspend fun releaseBuddy() {
-        pair.update("buddyUid", null).await()
+    /** Frees whichever seat this phone holds, checked against the database, for a phone that picked the wrong role. */
+    suspend fun releaseMySeat() {
+        val me = uid()
+        val current = runCatching { pair.get().await() }.getOrNull() ?: return
+        if (current.getString("ownerUid") == me) pair.update("ownerUid", null).await()
+        if (current.getString("buddyUid") == me) pair.update("buddyUid", null).await()
     }
 
     suspend fun pushDay(date: String, day: SharedDay) {

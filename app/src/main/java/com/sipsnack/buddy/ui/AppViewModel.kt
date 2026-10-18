@@ -17,7 +17,8 @@ import com.sipsnack.buddy.rules.Sharing
 import com.sipsnack.buddy.sync.DayDoc
 import com.sipsnack.buddy.sync.PairState
 import com.sipsnack.buddy.sync.Pairing
-import com.sipsnack.buddy.sync.PairingException
+import com.sipsnack.buddy.sync.reason
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -74,6 +75,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val myUid = MutableStateFlow<String?>(null)
 
+    /** Why this phone isn't linked yet, in plain words; null when linked or not trying. */
+    val linkProblem = MutableStateFlow<String?>(null)
+    private var linking: Job? = null
+
     /** The one-tap "Let Walking Selfie Stick cheer you on?" card. */
     val askShare = MutableStateFlow(prefs.role == "her" && Pairing.available && prefs.shouldAskToShare())
 
@@ -85,6 +90,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (Pairing.available) viewModelScope.launch { myUid.value = runCatching { Pairing.uid() }.getOrNull() }
         syncHerDay()
         watchCheers()
+        autoLink()
+    }
+
+    /**
+     * Every time the app opens (and after the role or her answer changes), make sure this phone holds its
+     * seat: his always, hers once she has said yes. Retries with growing gaps; a seat held by another
+     * install stops the retries and says so.
+     */
+    fun autoLink() {
+        if (!Pairing.available) return
+        val wants = when (role.value) {
+            "buddy" -> "buddy"
+            "her" -> if (prefs.shareAnswer == "yes") "her" else null
+            else -> null
+        } ?: run { linkProblem.value = null; return }
+        linking?.cancel()
+        linking = viewModelScope.launch {
+            for (wait in listOf(0L, 3_000L, 10_000L, 30_000L, 60_000L, 120_000L)) {
+                delay(wait)
+                val result = runCatching { if (wants == "her") Pairing.linkHer() else Pairing.linkBuddy() }
+                myUid.value = runCatching { Pairing.uid() }.getOrNull()
+                if (result.isSuccess) { linkProblem.value = null; return@launch }
+                val error = result.exceptionOrNull()!!
+                linkProblem.value = error.reason()
+            }
+        }
     }
 
     /** On her phone, every change to today's logs reaches her buddy a moment later. */
@@ -117,29 +148,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseRole(newRole: String) {
         prefs.role = newRole
         role.value = newRole
-        if (newRole == "buddy") {
-            viewModelScope.launch {
-                runCatching { Pairing.claimBuddy() }.onFailure {
-                    if (it.message != "already") toast.value = "Couldn't link up: someone else already has the buddy seat."
-                }
-            }
-        } else {
-            askShare.value = Pairing.available && prefs.shouldAskToShare()
-        }
+        if (newRole == "her") askShare.value = Pairing.available && prefs.shouldAskToShare()
+        autoLink()
     }
 
     /** For a phone that picked the wrong role: frees its seat and asks again. */
     fun switchRole() {
-        val me = myUid.value
-        val p = pair.value
+        linking?.cancel()
+        linkProblem.value = null
         viewModelScope.launch {
-            runCatching {
-                if (role.value == "her" && p?.ownerUid == me) Pairing.releaseOwner()
-                if (role.value == "buddy" && p?.buddyUid == me) Pairing.releaseBuddy()
-            }
+            runCatching { Pairing.releaseMySeat() }
+            prefs.role = null
+            role.value = null
         }
-        prefs.role = null
-        role.value = null
     }
 
     fun acceptShare() {
@@ -155,13 +176,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         askShare.value = false
     }
 
+    /** Her explicit "share" tap: links her seat and un-pauses. */
     fun startSharing() {
+        prefs.shareAnswer = "yes"
         viewModelScope.launch {
-            runCatching { Pairing.claimHer(pair.value?.level ?: ShareLevel.WITH_MEALS) }.onFailure {
-                toast.value = when (it) {
-                    is PairingException -> "Couldn't turn on sharing: another phone holds your seat."
-                    else -> "Couldn't turn on sharing. Check your internet and try again."
-                }
+            runCatching {
+                Pairing.linkHer()
+                Pairing.setSharing(true, false, pair.value?.level ?: ShareLevel.WITH_MEALS)
+            }.onSuccess {
+                linkProblem.value = null
+            }.onFailure {
+                linkProblem.value = it.reason()
+                toast.value = "Couldn't turn on sharing: ${it.reason()}."
+                autoLink()
             }
         }
     }
