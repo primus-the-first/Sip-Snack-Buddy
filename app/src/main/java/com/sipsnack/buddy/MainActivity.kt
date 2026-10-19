@@ -37,6 +37,7 @@ import com.sipsnack.buddy.ui.BuddyScreen
 import com.sipsnack.buddy.ui.BuddyTabs
 import com.sipsnack.buddy.ui.RoleScreen
 import com.sipsnack.buddy.ui.ShareAskCard
+import com.sipsnack.buddy.ui.ShareMedsCard
 import com.sipsnack.buddy.ui.SharingScreen
 import com.sipsnack.buddy.ui.CameraScreen
 import com.sipsnack.buddy.ui.MemeCard
@@ -64,6 +65,9 @@ class MainActivity : ComponentActivity() {
                 val toast by vm.toast.collectAsState()
                 val role by vm.role.collectAsState()
                 val askShare by vm.askShare.collectAsState()
+                val meds by vm.meds.collectAsState()
+                val shareMeds by vm.shareMeds.collectAsState()
+                val pairState by vm.pair.collectAsState()
 
                 BackHandler(enabled = screen in listOf("camera", "settings", "sharing")) { screen = "today" }
 
@@ -86,6 +90,8 @@ class MainActivity : ComponentActivity() {
 
                     if (role == "her" && askShare && moment == null) {
                         ShareAskCard(onYes = vm::acceptShare, onNotNow = vm::declineShare)
+                    } else if (role == "her" && moment == null && meds.isNotEmpty() && shareMeds == null && pairState?.sharing == true) {
+                        ShareMedsCard(onYes = { vm.setShareMeds(true) }, onNo = { vm.setShareMeds(false) })
                     }
 
                     toast?.let { text ->

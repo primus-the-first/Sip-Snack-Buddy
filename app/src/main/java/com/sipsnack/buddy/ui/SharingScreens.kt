@@ -101,6 +101,7 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
     var confirmStop by remember { mutableStateOf(false) }
     val problem by vm.linkProblem.collectAsState()
     val shareSteps by vm.shareSteps.collectAsState()
+    val shareMeds by vm.shareMeds.collectAsState()
 
     Column(
         Modifier.fillMaxSize().background(Sip.Ink).statusBarsPadding().navigationBarsPadding()
@@ -180,6 +181,22 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
             }
             Switch(
                 checked = shareSteps,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(checkedTrackColor = Sip.Electric, checkedThumbColor = Sip.Ink, uncheckedTrackColor = Sip.Deep, uncheckedThumbColor = Sip.Muted, uncheckedBorderColor = Sip.Line),
+            )
+        }
+
+        Row(
+            Modifier.fillMaxWidth().card().heightIn(min = 64.dp)
+                .toggleable(shareMeds == true, role = Role.Switch, onValueChange = vm::setShareMeds).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Share my medicine check-offs", style = SipType.BodyStrong)
+                Text("He sees only whether each one is taken today, and when.", style = SipType.Small)
+            }
+            Switch(
+                checked = shareMeds == true,
                 onCheckedChange = null,
                 colors = SwitchDefaults.colors(checkedTrackColor = Sip.Electric, checkedThumbColor = Sip.Ink, uncheckedTrackColor = Sip.Deep, uncheckedThumbColor = Sip.Muted, uncheckedBorderColor = Sip.Line),
             )

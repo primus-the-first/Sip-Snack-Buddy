@@ -33,6 +33,10 @@ interface LogDao {
     @Query("SELECT * FROM logs WHERE atMillis >= :from AND atMillis < :until ORDER BY atMillis DESC")
     suspend fun betweenNow(from: Long, until: Long): List<LogRow>
 
+    /** Medicine check-offs since a moment, for streaks. */
+    @Query("SELECT * FROM logs WHERE kind = 'MED' AND atMillis >= :from ORDER BY atMillis DESC")
+    fun medsSince(from: Long): Flow<List<LogRow>>
+
     @Insert
     suspend fun insert(row: LogRow): Long
 

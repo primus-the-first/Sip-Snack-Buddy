@@ -71,6 +71,8 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
             Text("Changes in steps of 250 ml. Check with your doctor before changing it.", style = SipType.Small)
         }
 
+        MedsSettings(vm)
+
         Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Daily step goal", style = SipType.Section)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {

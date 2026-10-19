@@ -71,6 +71,27 @@ class Prefs(context: Context) {
                 .putLong("stepLast", value.last).putLong("stepCarried", value.carried).apply()
         }
 
+    /** Her medicines (once a day each). Becoatin is set up the first time her phone opens this version. */
+    var meds: List<com.sipsnack.buddy.rules.Med>
+        get() = com.sipsnack.buddy.rules.Meds.decode(sp.getString("meds", null))
+        set(value) = sp.edit().putString("meds", com.sipsnack.buddy.rules.Meds.encode(value)).apply()
+
+    var medsSeeded: Boolean
+        get() = sp.getBoolean("medsSeeded", false)
+        set(value) = sp.edit().putBoolean("medsSeeded", value).apply()
+
+    /** Whether her medicine check-offs go to her buddy: null until she answers the one-time question. */
+    var shareMeds: Boolean?
+        get() = if (sp.contains("shareMeds")) sp.getBoolean("shareMeds", false) else null
+        set(value) { if (value == null) sp.edit().remove("shareMeds").apply() else sp.edit().putBoolean("shareMeds", value).apply() }
+
+    fun medRemindersToday(id: String, today: LocalDate = LocalDate.now()): Int =
+        if (sp.getString("medRemDay_$id", null) == today.toString()) sp.getInt("medRem_$id", 0) else 0
+
+    fun countMedReminder(id: String, today: LocalDate = LocalDate.now()) {
+        sp.edit().putString("medRemDay_$id", today.toString()).putInt("medRem_$id", medRemindersToday(id, today) + 1).apply()
+    }
+
     /** Ids of logs her buddy added that this phone already took into her day (the last 200). */
     var importedIds: Set<String>
         get() = sp.getStringSet("importedIds", emptySet())!!

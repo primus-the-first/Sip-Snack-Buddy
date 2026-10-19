@@ -2,7 +2,8 @@ package com.sipsnack.buddy.rules
 
 // Pure rules for her day: no Android imports, all unit-tested. Numbers here are starting values to tune.
 
-enum class LogKind { WATER, OTHER_DRINK, MEAL, SNACK }
+/** MED is a medicine ticked off as taken; its label is the medicine name. */
+enum class LogKind { WATER, OTHER_DRINK, MEAL, SNACK, MED }
 
 data class LogEntry(val atMillis: Long, val kind: LogKind, val cups: Double, val label: String = "")
 

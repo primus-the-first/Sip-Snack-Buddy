@@ -32,6 +32,13 @@ class SharingTest {
     }
 
     @Test
+    fun medicines_never_appear_in_the_shared_timeline() {
+        val withMed = day + LogEntry(6_000, LogKind.MED, 0.0, "Becoatin")
+        val shared = Sharing.summarise(withMed, goal = 8, level = ShareLevel.WITH_MEALS)
+        assertEquals(5, shared.events.size)
+    }
+
+    @Test
     fun an_empty_day_has_no_last_sip() {
         assertEquals(null, Sharing.summarise(emptyList(), goal = 8, level = ShareLevel.WITH_MEALS).lastSipMillis)
     }

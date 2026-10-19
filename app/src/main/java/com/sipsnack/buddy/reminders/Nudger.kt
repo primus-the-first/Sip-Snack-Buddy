@@ -5,7 +5,8 @@ import com.sipsnack.buddy.HER_NAME
 import com.sipsnack.buddy.sync.Pairing
 import com.sipsnack.buddy.sync.Importer
 import com.sipsnack.buddy.steps.StepSensor
-import com.sipsnack.buddy.rules.Sharing
+import com.sipsnack.buddy.sync.HerDay
+import com.sipsnack.buddy.rules.Meds
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -46,6 +47,7 @@ object Nudger {
     private const val CHANNEL_STILL = "still_delaying"
     private const val CHANNEL_MEALS = "meals"
     private const val CHANNEL_BUDDY = "buddy"
+    private const val CHANNEL_MEDS = "meds"
     private const val WORK = "nudge-check"
 
     /** Each channel carries its meme sound; Android fixes a channel's sound once it exists. */
@@ -65,6 +67,9 @@ object Nudger {
                 },
                 NotificationChannel(CHANNEL_MEALS, "Meal nudges", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "When lunch or dinner hasn't been logged"
+                },
+                NotificationChannel(CHANNEL_MEDS, "Medicine reminders", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Your medicine at your chosen time, and one follow-up"
                 },
                 NotificationChannel(CHANNEL_BUDDY, "Cheers and wins", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "Cheers from your buddy, and her goal wins on a buddy phone"
@@ -106,6 +111,24 @@ object Nudger {
         NotificationManagerCompat.from(context).notify(if (moment == Moment.MEAL_DELAY) 2 else 1, notification)
     }
 
+    /** Her medicine reminder; the follow-up is worded more gently insistent. Tapping opens the app to tick it off. */
+    fun notifyMed(context: Context, med: com.sipsnack.buddy.rules.Med, followUp: Boolean) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val open = PendingIntent.getActivity(
+            context, 300 + med.id.hashCode() % 1000, Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_MEDS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF3D8BFF.toInt())
+            .setContentTitle(if (followUp) "Still time for your ${med.name}" else "Time for your ${med.name}")
+            .setContentText(if (followUp) "Tap Taken once you've had it. Your streak is waiting." else "Tap Taken in the app once you've had it.")
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(1000 + (med.id.hashCode() and 0xFFF), notification)
+    }
+
     /** A plain notification that opens the app: cheers on her phone, goal wins on his. */
     fun notifyBuddy(context: Context, id: Int, title: String, text: String) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
@@ -131,6 +154,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     override suspend fun doWork(): Result {
         val prefs = Prefs(applicationContext)
         val steps = StepSensor.todaySteps(applicationContext)
+        remindMeds(prefs)
         checkBuddyNews(prefs)
         takeHisLogs(prefs, steps)
         if (!prefs.nudgesOn) return Result.success()
@@ -197,6 +221,24 @@ private suspend fun NudgeWorker.checkBuddyNews(prefs: Prefs) {
     }
 }
 
+/** Medicine reminders: one at her time, one follow-up two hours later, none once it's ticked off. */
+private suspend fun NudgeWorker.remindMeds(prefs: Prefs) {
+    val meds = prefs.meds
+    if (meds.isEmpty()) return
+    val now = ZonedDateTime.now()
+    val today = now.toLocalDate()
+    val minute = now.hour * 60 + now.minute
+    val todays = AppDb.get(applicationContext).logs().betweenNow(today.startMillis(), today.plusDays(1).startMillis())
+    for (med in meds) {
+        val taken = todays.any { it.kind == LogKind.MED.name && it.label == med.name }
+        val count = prefs.medRemindersToday(med.id, today)
+        if (Meds.shouldRemind(med, minute, taken, count)) {
+            Nudger.notifyMed(applicationContext, med, followUp = count >= 1)
+            prefs.countMedReminder(med.id, today)
+        }
+    }
+}
+
 /** On her phone, logs her buddy added while her app was closed land in her day and the shared summary. */
 private suspend fun NudgeWorker.takeHisLogs(prefs: Prefs, steps: Int?) {
     if (!Pairing.available || prefs.role != "her") return
@@ -210,8 +252,7 @@ private suspend fun NudgeWorker.takeHisLogs(prefs: Prefs, steps: Int?) {
         val today = LocalDate.now()
         val entries = AppDb.get(applicationContext).logs()
             .betweenNow(today.startMillis(), today.plusDays(1).startMillis()).map { it.toEntry() }
-        val shared = if (prefs.shareSteps) steps else null
-        Pairing.pushDay(today.toString(), Sharing.summarise(entries, prefs.goal, pair.level).copy(steps = shared, stepGoal = shared?.let { prefs.stepGoal }))
+        Pairing.pushDay(today.toString(), HerDay.build(entries, prefs, pair.level, steps, prefs.meds))
     }
 }
 

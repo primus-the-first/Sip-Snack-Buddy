@@ -120,6 +120,7 @@ fun BuddyScreen(vm: AppViewModel) {
             pair?.paused == true -> Message("$HER_NAME has paused sharing for now. It'll come back when she turns it on.")
             else -> {
                 TodayCard(todayDoc)
+                todayDoc?.day?.meds?.let { SharedMedsCard(it) }
                 todayDoc?.day?.steps?.let { StepsBar(it, todayDoc.day.stepGoal ?: 5_000) }
                 if (pair?.allowAdds != false) LogForHer(vm, waiting.size)
                 if (todayDoc != null && todayDoc.day.events.isNotEmpty()) HerDay(todayDoc)
@@ -245,7 +246,7 @@ private fun HerDay(doc: DayDoc) {
             Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(timeOf(e.atMillis), style = SipType.Small, modifier = Modifier.width(72.dp))
                 Text(
-                    when (e.kind) { LogKind.WATER -> "Water"; LogKind.OTHER_DRINK -> "Other drink"; LogKind.MEAL -> "Meal"; LogKind.SNACK -> "Snack" },
+                    when (e.kind) { LogKind.WATER -> "Water"; LogKind.OTHER_DRINK -> "Other drink"; LogKind.MEAL -> "Meal"; LogKind.SNACK -> "Snack"; LogKind.MED -> "Medicine" },
                     style = SipType.Body,
                     modifier = Modifier.weight(1f),
                 )

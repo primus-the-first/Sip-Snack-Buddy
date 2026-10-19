@@ -25,6 +25,10 @@ import com.sipsnack.buddy.rules.Units
 import com.sipsnack.buddy.sync.AddedLog
 import com.sipsnack.buddy.sync.Importer
 import com.sipsnack.buddy.steps.StepSensor
+import com.sipsnack.buddy.rules.Med
+import com.sipsnack.buddy.rules.Meds
+import com.sipsnack.buddy.sync.HerDay
+import kotlinx.coroutines.flow.merge
 import com.sipsnack.buddy.update.Updater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -110,6 +114,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val steps = MutableStateFlow<Int?>(null)
     val stepGoal = MutableStateFlow(prefs.stepGoal)
     val shareSteps = MutableStateFlow(prefs.shareSteps)
+
+    /** Her medicines and the last two months of check-offs (for today's status and streaks). */
+    val meds = MutableStateFlow(prefs.meds)
+    val medLogs: StateFlow<List<LogRow>> = dao.medsSince(LocalDate.now().minusDays(60).startMillis())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val shareMeds = MutableStateFlow(prefs.shareMeds)
     val memesOn = MutableStateFlow(prefs.memesOn)
     val nudgesOn = MutableStateFlow(prefs.nudgesOn)
 
@@ -117,9 +127,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (Pairing.available) viewModelScope.launch { myUid.value = runCatching { Pairing.uid() }.getOrNull() }
         syncHerDay()
         watchCheers()
+        seedMeds()
         takeHisLogs()
         countSteps()
         autoLink()
+    }
+
+    /** Becoatin, once a day at 8:00 am, the first time her phone runs this version. She can change it in Settings. */
+    private fun seedMeds() {
+        if (role.value == "her" && !prefs.medsSeeded) {
+            prefs.meds = listOf(Med(id = "becoatin", name = "Becoatin", minuteOfDay = 8 * 60))
+            prefs.medsSeeded = true
+            meds.value = prefs.meds
+        }
+    }
+
+    fun takenToday(med: Med): Long? {
+        val start = LocalDate.now().startMillis()
+        return medLogs.value.filter { it.label == med.name && it.atMillis >= start }.maxOfOrNull { it.atMillis }
+    }
+
+    fun streak(med: Med): Int {
+        val zone = java.time.ZoneId.systemDefault()
+        val days = medLogs.value.filter { it.label == med.name }
+            .map { java.time.Instant.ofEpochMilli(it.atMillis).atZone(zone).toLocalDate() }.toSet()
+        return Meds.streak(days, LocalDate.now())
+    }
+
+    fun takeMed(med: Med) {
+        if (takenToday(med) != null) return
+        viewModelScope.launch {
+            dao.insert(LogRow(atMillis = System.currentTimeMillis(), kind = LogKind.MED.name, cups = 0.0, label = med.name))
+            val zone = java.time.ZoneId.systemDefault()
+            val taken = medLogs.value.filter { it.label == med.name }
+                .map { java.time.Instant.ofEpochMilli(it.atMillis).atZone(zone).toLocalDate() }.toSet() + LocalDate.now()
+            val days = Meds.streak(taken, LocalDate.now())
+            if (memesOn.value) Memes.forMoment(Moment.CUP_LOGGED).sound?.let { Memes.playSound(getApplication(), it) }
+            toast.value = if (days >= 2) "${med.name} taken. $days days in a row!" else "${med.name} taken. Let's have it!"
+        }
+    }
+
+    fun addMed(name: String, minuteOfDay: Int) {
+        val clean = name.trim().take(40).ifEmpty { return }
+        prefs.meds = prefs.meds + Med(id = "m" + System.currentTimeMillis(), name = clean, minuteOfDay = minuteOfDay)
+        meds.value = prefs.meds
+    }
+
+    fun removeMed(id: String) {
+        prefs.meds = prefs.meds.filterNot { it.id == id }
+        meds.value = prefs.meds
+    }
+
+    fun setMedTime(id: String, minuteOfDay: Int) {
+        prefs.meds = prefs.meds.map { if (it.id == id) it.copy(minuteOfDay = minuteOfDay) else it }
+        meds.value = prefs.meds
+    }
+
+    fun setShareMeds(value: Boolean) {
+        prefs.shareMeds = value
+        shareMeds.value = value
     }
 
     /** Reads the step counter every half minute while the app is open. */
@@ -235,22 +301,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** On her phone, every change to today's logs reaches her buddy a moment later. */
+    /** On her phone, any change to what she shares reaches her buddy a moment later. */
     @OptIn(FlowPreview::class)
     private fun syncHerDay() {
         viewModelScope.launch {
-            combine(combine(todayLogs, pair, goal, myUid) { logs, p, g, me -> Triple(logs, p, g) to me }, steps, stepGoal, shareSteps) { a, st, sg, share ->
-                Triple(a, if (share) st else null, sg)
-            }
+            merge(todayLogs, pair, goal, myUid, steps, stepGoal, shareSteps, meds, shareMeds)
                 .debounce(1500)
-                .collect { (inner, st, sg) ->
-                    val (state, me) = inner
-                    val (logs, p, g) = state
+                .collect {
+                    val p = pair.value
+                    val me = myUid.value
                     if (role.value != "her" || p == null || me == null || p.ownerUid != me || !p.sharing || p.paused) return@collect
-                    val day = Sharing.summarise(logs.map { it.toEntry() }, g, p.level)
-                        .copy(steps = st, stepGoal = st?.let { sg })
+                    val day = HerDay.build(todayLogs.value.map { it.toEntry() }, prefs, p.level, steps.value, meds.value)
                     runCatching { Pairing.pushDay(LocalDate.now().toString(), day) }
-                    if (st != null && !prefs.toldStepsShared) {
+                    if (day.steps != null && !prefs.toldStepsShared) {
                         prefs.toldStepsShared = true
                         toast.value = "New: $BUDDY_NAME can see your steps too. Change it in Sharing."
                     }
@@ -273,7 +336,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseRole(newRole: String) {
         prefs.role = newRole
         role.value = newRole
-        if (newRole == "her") askShare.value = Pairing.available && prefs.shouldAskToShare()
+        if (newRole == "her") {
+            askShare.value = Pairing.available && prefs.shouldAskToShare()
+            seedMeds()
+        }
         autoLink()
     }
 

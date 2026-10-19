@@ -124,6 +124,8 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
             }
         }
 
+        MedsCard(vm)
+
         StepsCard(vm)
 
         PrimaryButton("Snap it", onClick = onSnap, modifier = Modifier.fillMaxWidth())
@@ -205,6 +207,7 @@ private fun LogLine(row: LogRow, onClick: () -> Unit) {
             LogKind.OTHER_DRINK -> "Drink"
             LogKind.MEAL -> "Meal"
             LogKind.SNACK -> "Snack"
+            LogKind.MED -> "Taken"
         }
         Text(right, style = SipType.Small.copy(color = if (kind == LogKind.WATER) Sip.Ice else Sip.Muted))
     }

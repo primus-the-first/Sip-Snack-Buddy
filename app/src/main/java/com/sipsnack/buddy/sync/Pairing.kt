@@ -159,6 +159,7 @@ object Pairing {
                 "events" to day.events.map { mapOf("t" to it.atMillis, "k" to it.kind.name, "c" to it.cups) },
                 "steps" to day.steps,
                 "stepGoal" to day.stepGoal,
+                "meds" to day.meds?.map { mapOf("name" to it.name, "due" to it.dueMinute, "takenAt" to it.takenAt) },
                 "updatedAt" to System.currentTimeMillis(),
             ),
         ).await()
@@ -280,6 +281,10 @@ object Pairing {
                 events = events,
                 steps = getLong("steps")?.toInt(),
                 stepGoal = getLong("stepGoal")?.toInt(),
+                meds = (get("meds") as? List<Map<String, Any?>>)?.mapNotNull { m ->
+                    val name = m["name"] as? String ?: return@mapNotNull null
+                    com.sipsnack.buddy.rules.SharedMed(name, (m["due"] as? Number)?.toInt() ?: 0, (m["takenAt"] as? Number)?.toLong())
+                },
             ),
             updatedAt = getLong("updatedAt") ?: 0L,
         )

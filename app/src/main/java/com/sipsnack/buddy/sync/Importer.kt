@@ -24,6 +24,7 @@ object Importer {
                     LogKind.OTHER_DRINK -> "Drink"
                     LogKind.MEAL -> "Meal"
                     LogKind.SNACK -> "Snack"
+                    LogKind.MED -> "Medicine"
                 }
                 dao.insert(LogRow(atMillis = log.atMillis, kind = log.kind.name, cups = log.cups, label = "$what · by $BUDDY_NAME"))
                 prefs.importedIds = prefs.importedIds + log.id

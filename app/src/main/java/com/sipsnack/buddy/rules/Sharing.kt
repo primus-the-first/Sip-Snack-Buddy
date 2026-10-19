@@ -8,6 +8,9 @@ enum class ShareLevel { PROGRESS, WITH_MEALS }
 /** One log as the buddy sees it: when and what, never labels or photos. */
 data class SharedEvent(val atMillis: Long, val kind: LogKind, val cups: Double)
 
+/** A medicine as her buddy sees it: name, when it's due, and when she took it today (null = not yet). */
+data class SharedMed(val name: String, val dueMinute: Int, val takenAt: Long?)
+
 data class SharedDay(
     val cups: Double,
     val goal: Int,
@@ -15,6 +18,7 @@ data class SharedDay(
     val events: List<SharedEvent>,
     val steps: Int? = null,
     val stepGoal: Int? = null,
+    val meds: List<SharedMed>? = null,
 )
 
 object Sharing {
@@ -27,7 +31,7 @@ object Sharing {
             cups = Hydration.cups(sorted),
             goal = goal,
             lastSipMillis = sorted.lastOrNull { it.kind == LogKind.WATER || it.kind == LogKind.OTHER_DRINK }?.atMillis,
-            events = if (level == ShareLevel.WITH_MEALS) sorted.map { SharedEvent(it.atMillis, it.kind, it.cups) } else emptyList(),
+            events = if (level == ShareLevel.WITH_MEALS) sorted.filter { it.kind != LogKind.MED }.map { SharedEvent(it.atMillis, it.kind, it.cups) } else emptyList(),
         )
     }
 
