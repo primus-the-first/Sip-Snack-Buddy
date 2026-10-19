@@ -52,6 +52,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("shareSteps", true)
         set(value) = sp.edit().putBoolean("shareSteps", value).apply()
 
+    /** Keep the step counter running all day (a quiet notification shows while it counts). */
+    var stepsAllDay: Boolean
+        get() = sp.getBoolean("stepsAllDay", true)
+        set(value) = sp.edit().putBoolean("stepsAllDay", value).apply()
+
     var toldStepsShared: Boolean
         get() = sp.getBoolean("toldStepsShared", false)
         set(value) = sp.edit().putBoolean("toldStepsShared", value).apply()

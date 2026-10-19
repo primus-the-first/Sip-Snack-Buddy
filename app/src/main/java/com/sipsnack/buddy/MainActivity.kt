@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
         vm.autoLink()
         vm.checkForUpdate()
         vm.refreshSteps()
+        com.sipsnack.buddy.steps.StepSensor.keepCounting(this)
     }
 
     override fun onNewIntent(intent: Intent) {

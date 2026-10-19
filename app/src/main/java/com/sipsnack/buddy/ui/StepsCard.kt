@@ -36,7 +36,10 @@ fun StepsCard(vm: AppViewModel) {
     if (!StepSensor.available(context)) return
     val steps by vm.steps.collectAsState()
     val goal by vm.stepGoal.collectAsState()
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.refreshSteps() }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        vm.refreshSteps()
+        StepSensor.keepCounting(context)
+    }
 
     if (!StepSensor.allowed(context)) {
         Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

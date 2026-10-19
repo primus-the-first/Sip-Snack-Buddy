@@ -114,6 +114,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val steps = MutableStateFlow<Int?>(null)
     val stepGoal = MutableStateFlow(prefs.stepGoal)
     val shareSteps = MutableStateFlow(prefs.shareSteps)
+    val stepsAllDay = MutableStateFlow(prefs.stepsAllDay)
 
     /** Her medicines and the last two months of check-offs (for today's status and streaks). */
     val meds = MutableStateFlow(prefs.meds)
@@ -215,6 +216,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setStepGoal(value: Int) {
         prefs.stepGoal = value
         stepGoal.value = prefs.stepGoal
+    }
+
+    fun setStepsAllDay(value: Boolean) {
+        prefs.stepsAllDay = value
+        stepsAllDay.value = value
+        if (value) StepSensor.keepCounting(getApplication()) else StepSensor.stopCounting(getApplication())
     }
 
     fun setShareSteps(value: Boolean) {

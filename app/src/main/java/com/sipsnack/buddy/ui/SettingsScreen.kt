@@ -47,6 +47,8 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
     val nudgesOn by vm.nudgesOn.collectAsState()
     var confirmWipe by remember { mutableStateOf(false) }
     val stepGoal by vm.stepGoal.collectAsState()
+    val stepsAllDay by vm.stepsAllDay.collectAsState()
+    val hasStepSensor = com.sipsnack.buddy.steps.StepSensor.available(androidx.compose.ui.platform.LocalContext.current)
 
     Column(
         Modifier.fillMaxSize().background(Sip.Ink).statusBarsPadding().navigationBarsPadding()
@@ -86,6 +88,9 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
         Column(Modifier.fillMaxWidth().card().padding(horizontal = 20.dp, vertical = 8.dp)) {
             Toggle("Meme videos and sounds", "Celebrations when you log and hit your goal", memesOn, vm::setMemesOn)
             Toggle("Delay and meal nudges", "The side-eye, Akrobeto and meal reminders. 8 am to 10 pm, at most 3 a day.", nudgesOn, vm::setNudgesOn)
+            if (hasStepSensor) {
+                Toggle("Count steps all day", "Keeps counting when the app is closed. A quiet notification shows your steps.", stepsAllDay, vm::setStepsAllDay)
+            }
         }
 
         if (com.sipsnack.buddy.sync.Pairing.available && vm.role.value == "her") {

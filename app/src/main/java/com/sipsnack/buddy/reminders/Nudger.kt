@@ -48,6 +48,7 @@ object Nudger {
     private const val CHANNEL_MEALS = "meals"
     private const val CHANNEL_BUDDY = "buddy"
     private const val CHANNEL_MEDS = "meds"
+    const val CHANNEL_STEPS = "steps"
     private const val WORK = "nudge-check"
 
     /** Each channel carries its meme sound; Android fixes a channel's sound once it exists. */
@@ -70,6 +71,10 @@ object Nudger {
                 },
                 NotificationChannel(CHANNEL_MEDS, "Medicine reminders", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Your medicine at your chosen time, and one follow-up"
+                },
+                NotificationChannel(CHANNEL_STEPS, "Step counter", NotificationManager.IMPORTANCE_MIN).apply {
+                    description = "Shows quietly while your steps are counted all day"
+                    setShowBadge(false)
                 },
                 NotificationChannel(CHANNEL_BUDDY, "Cheers and wins", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "Cheers from your buddy, and her goal wins on a buddy phone"
