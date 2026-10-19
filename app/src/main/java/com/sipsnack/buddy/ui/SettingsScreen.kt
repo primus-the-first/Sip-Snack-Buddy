@@ -46,6 +46,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
     val memesOn by vm.memesOn.collectAsState()
     val nudgesOn by vm.nudgesOn.collectAsState()
     var confirmWipe by remember { mutableStateOf(false) }
+    val stepGoal by vm.stepGoal.collectAsState()
 
     Column(
         Modifier.fillMaxSize().background(Sip.Ink).statusBarsPadding().navigationBarsPadding()
@@ -68,6 +69,16 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
                 OutlineButton("+", onClick = { vm.setGoal(goal + 1) })
             }
             Text("Changes in steps of 250 ml. Check with your doctor before changing it.", style = SipType.Small)
+        }
+
+        Column(Modifier.fillMaxWidth().card().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Daily step goal", style = SipType.Section)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlineButton("−", onClick = { vm.setStepGoal(stepGoal - 500) })
+                Text("%,d".format(java.util.Locale.US, stepGoal), style = SipType.Title)
+                OutlineButton("+", onClick = { vm.setStepGoal(stepGoal + 500) })
+            }
+            Text("Start gentle and build up. Your doctor can say what's right for you.", style = SipType.Small)
         }
 
         Column(Modifier.fillMaxWidth().card().padding(horizontal = 20.dp, vertical = 8.dp)) {

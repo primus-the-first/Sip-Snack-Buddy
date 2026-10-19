@@ -4,6 +4,7 @@ import com.sipsnack.buddy.BUDDY_NAME
 import com.sipsnack.buddy.HER_NAME
 import com.sipsnack.buddy.sync.Pairing
 import com.sipsnack.buddy.sync.Importer
+import com.sipsnack.buddy.steps.StepSensor
 import com.sipsnack.buddy.rules.Sharing
 import android.Manifest
 import android.app.NotificationChannel
@@ -129,8 +130,9 @@ object Nudger {
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val prefs = Prefs(applicationContext)
+        val steps = StepSensor.todaySteps(applicationContext)
         checkBuddyNews(prefs)
-        takeHisLogs(prefs)
+        takeHisLogs(prefs, steps)
         if (!prefs.nudgesOn) return Result.success()
 
         val zone = ZoneId.systemDefault()
@@ -196,17 +198,20 @@ private suspend fun NudgeWorker.checkBuddyNews(prefs: Prefs) {
 }
 
 /** On her phone, logs her buddy added while her app was closed land in her day and the shared summary. */
-private suspend fun NudgeWorker.takeHisLogs(prefs: Prefs) {
+private suspend fun NudgeWorker.takeHisLogs(prefs: Prefs, steps: Int?) {
     if (!Pairing.available || prefs.role != "her") return
     runCatching {
         val me = Pairing.uid()
         val pair = Pairing.readPair() ?: return
         if (pair.ownerUid != me || !pair.sharing) return
-        if (Importer.take(applicationContext, Pairing.readAdded()) == 0 || pair.paused) return
+        Importer.take(applicationContext, Pairing.readAdded())
+        if (pair.paused) return
+        // Refresh her shared day every run, so his view keeps up with her steps and any logs he added.
         val today = LocalDate.now()
         val entries = AppDb.get(applicationContext).logs()
             .betweenNow(today.startMillis(), today.plusDays(1).startMillis()).map { it.toEntry() }
-        Pairing.pushDay(today.toString(), Sharing.summarise(entries, prefs.goal, pair.level))
+        val shared = if (prefs.shareSteps) steps else null
+        Pairing.pushDay(today.toString(), Sharing.summarise(entries, prefs.goal, pair.level).copy(steps = shared, stepGoal = shared?.let { prefs.stepGoal }))
     }
 }
 

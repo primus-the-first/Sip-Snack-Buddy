@@ -124,6 +124,8 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
             }
         }
 
+        StepsCard(vm)
+
         PrimaryButton("Snap it", onClick = onSnap, modifier = Modifier.fillMaxWidth())
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -42,6 +42,35 @@ class Prefs(context: Context) {
         get() = sp.getLong("shareAskedAt", 0L)
         set(value) = sp.edit().putLong("shareAskedAt", value).apply()
 
+    /** Daily step goal; gentle by default. */
+    var stepGoal: Int
+        get() = sp.getInt("stepGoal", 5_000)
+        set(value) = sp.edit().putInt("stepGoal", value.coerceIn(1_000, 20_000)).apply()
+
+    /** Whether her steps go to her buddy with her shared day (her phone only). */
+    var shareSteps: Boolean
+        get() = sp.getBoolean("shareSteps", true)
+        set(value) = sp.edit().putBoolean("shareSteps", value).apply()
+
+    var toldStepsShared: Boolean
+        get() = sp.getBoolean("toldStepsShared", false)
+        set(value) = sp.edit().putBoolean("toldStepsShared", value).apply()
+
+    var stepGoalCelebratedDay: String?
+        get() = sp.getString("stepGoalCelebratedDay", null)
+        set(value) = sp.edit().putString("stepGoalCelebratedDay", value).apply()
+
+    var stepState: com.sipsnack.buddy.rules.StepState?
+        get() {
+            val day = sp.getString("stepDay", null) ?: return null
+            return com.sipsnack.buddy.rules.StepState(day, sp.getLong("stepBase", 0), sp.getLong("stepLast", 0), sp.getLong("stepCarried", 0))
+        }
+        set(value) {
+            if (value == null) return
+            sp.edit().putString("stepDay", value.day).putLong("stepBase", value.base)
+                .putLong("stepLast", value.last).putLong("stepCarried", value.carried).apply()
+        }
+
     /** Ids of logs her buddy added that this phone already took into her day (the last 200). */
     var importedIds: Set<String>
         get() = sp.getStringSet("importedIds", emptySet())!!

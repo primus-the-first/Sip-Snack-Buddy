@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.autoLink()
         vm.checkForUpdate()
+        vm.refreshSteps()
     }
 
     override fun onNewIntent(intent: Intent) {

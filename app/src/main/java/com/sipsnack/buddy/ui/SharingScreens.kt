@@ -100,6 +100,7 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
     val paused = pair?.paused == true
     var confirmStop by remember { mutableStateOf(false) }
     val problem by vm.linkProblem.collectAsState()
+    val shareSteps by vm.shareSteps.collectAsState()
 
     Column(
         Modifier.fillMaxSize().background(Sip.Ink).statusBarsPadding().navigationBarsPadding()
@@ -163,6 +164,22 @@ fun SharingScreen(vm: AppViewModel, onBack: () -> Unit) {
             }
             Switch(
                 checked = paused,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(checkedTrackColor = Sip.Electric, checkedThumbColor = Sip.Ink, uncheckedTrackColor = Sip.Deep, uncheckedThumbColor = Sip.Muted, uncheckedBorderColor = Sip.Line),
+            )
+        }
+
+        Row(
+            Modifier.fillMaxWidth().card().heightIn(min = 64.dp)
+                .toggleable(shareSteps, role = Role.Switch, onValueChange = vm::setShareSteps).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Share my steps", style = SipType.BodyStrong)
+                Text("$BUDDY_NAME sees today's step count with your water.", style = SipType.Small)
+            }
+            Switch(
+                checked = shareSteps,
                 onCheckedChange = null,
                 colors = SwitchDefaults.colors(checkedTrackColor = Sip.Electric, checkedThumbColor = Sip.Ink, uncheckedTrackColor = Sip.Deep, uncheckedThumbColor = Sip.Muted, uncheckedBorderColor = Sip.Line),
             )

@@ -158,6 +158,8 @@ object Pairing {
                 "goal" to day.goal,
                 "lastSipAt" to day.lastSipMillis,
                 "events" to day.events.map { mapOf("t" to it.atMillis, "k" to it.kind.name, "c" to it.cups) },
+                "steps" to day.steps,
+                "stepGoal" to day.stepGoal,
                 "updatedAt" to System.currentTimeMillis(),
             ),
         ).await()
@@ -268,6 +270,8 @@ object Pairing {
                 goal = getLong("goal")?.toInt() ?: 8,
                 lastSipMillis = getLong("lastSipAt"),
                 events = events,
+                steps = getLong("steps")?.toInt(),
+                stepGoal = getLong("stepGoal")?.toInt(),
             ),
             updatedAt = getLong("updatedAt") ?: 0L,
         )

@@ -24,6 +24,7 @@ import com.sipsnack.buddy.HER_NAME
 import com.sipsnack.buddy.rules.Units
 import com.sipsnack.buddy.sync.AddedLog
 import com.sipsnack.buddy.sync.Importer
+import com.sipsnack.buddy.steps.StepSensor
 import com.sipsnack.buddy.update.Updater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -105,6 +106,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val askShare = MutableStateFlow(prefs.role == "her" && Pairing.available && prefs.shouldAskToShare())
 
     val goal = MutableStateFlow(prefs.goal)
+
+    /** Today's steps on this phone; null when it can't count them (no sensor, or not allowed yet). */
+    val steps = MutableStateFlow<Int?>(null)
+    val stepGoal = MutableStateFlow(prefs.stepGoal)
+    val shareSteps = MutableStateFlow(prefs.shareSteps)
     val memesOn = MutableStateFlow(prefs.memesOn)
     val nudgesOn = MutableStateFlow(prefs.nudgesOn)
 
@@ -113,7 +119,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         syncHerDay()
         watchCheers()
         takeHisLogs()
+        countSteps()
         autoLink()
+    }
+
+    /** Reads the step counter every half minute while the app is open. */
+    private fun countSteps() {
+        viewModelScope.launch {
+            while (true) {
+                refreshSteps()
+                delay(30_000)
+            }
+        }
+    }
+
+    fun refreshSteps() {
+        viewModelScope.launch {
+            val now = StepSensor.todaySteps(getApplication()) ?: return@launch
+            val before = steps.value
+            steps.value = now
+            val today = LocalDate.now().toString()
+            if (before != null && before < stepGoal.value && now >= stepGoal.value && prefs.stepGoalCelebratedDay != today) {
+                prefs.stepGoalCelebratedDay = today
+                if (memesOn.value) Memes.forMoment(Moment.CUP_LOGGED).sound?.let { Memes.playSound(getApplication(), it) }
+                toast.value = "Let's have it! ${"%,d".format(java.util.Locale.US, now)} steps today."
+            }
+        }
+    }
+
+    fun setStepGoal(value: Int) {
+        prefs.stepGoal = value
+        stepGoal.value = prefs.stepGoal
+    }
+
+    fun setShareSteps(value: Boolean) {
+        prefs.shareSteps = value
+        shareSteps.value = value
     }
 
     /** On her phone, logs her buddy added land in her day while the app is open (the worker covers the rest). */
@@ -199,13 +240,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @OptIn(FlowPreview::class)
     private fun syncHerDay() {
         viewModelScope.launch {
-            combine(todayLogs, pair, goal, myUid) { logs, p, g, me -> Triple(logs, p, g) to me }
+            combine(combine(todayLogs, pair, goal, myUid) { logs, p, g, me -> Triple(logs, p, g) to me }, steps, stepGoal, shareSteps) { a, st, sg, share ->
+                Triple(a, if (share) st else null, sg)
+            }
                 .debounce(1500)
-                .collect { (state, me) ->
+                .collect { (inner, st, sg) ->
+                    val (state, me) = inner
                     val (logs, p, g) = state
                     if (role.value != "her" || p == null || me == null || p.ownerUid != me || !p.sharing || p.paused) return@collect
                     val day = Sharing.summarise(logs.map { it.toEntry() }, g, p.level)
+                        .copy(steps = st, stepGoal = st?.let { sg })
                     runCatching { Pairing.pushDay(LocalDate.now().toString(), day) }
+                    if (st != null && !prefs.toldStepsShared) {
+                        prefs.toldStepsShared = true
+                        toast.value = "New: $BUDDY_NAME can see your steps too. Change it in Sharing."
+                    }
                 }
         }
     }

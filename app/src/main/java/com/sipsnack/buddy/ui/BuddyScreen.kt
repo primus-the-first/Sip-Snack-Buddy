@@ -120,6 +120,7 @@ fun BuddyScreen(vm: AppViewModel) {
             pair?.paused == true -> Message("$HER_NAME has paused sharing for now. It'll come back when she turns it on.")
             else -> {
                 TodayCard(todayDoc)
+                todayDoc?.day?.steps?.let { StepsBar(it, todayDoc.day.stepGoal ?: 5_000) }
                 if (pair?.allowAdds != false) LogForHer(vm, waiting.size)
                 if (todayDoc != null && todayDoc.day.events.isNotEmpty()) HerDay(todayDoc)
                 if (week.isNotEmpty()) WeekCard(week)

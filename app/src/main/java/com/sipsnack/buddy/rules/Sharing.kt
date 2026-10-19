@@ -8,7 +8,14 @@ enum class ShareLevel { PROGRESS, WITH_MEALS }
 /** One log as the buddy sees it: when and what, never labels or photos. */
 data class SharedEvent(val atMillis: Long, val kind: LogKind, val cups: Double)
 
-data class SharedDay(val cups: Double, val goal: Int, val lastSipMillis: Long?, val events: List<SharedEvent>)
+data class SharedDay(
+    val cups: Double,
+    val goal: Int,
+    val lastSipMillis: Long?,
+    val events: List<SharedEvent>,
+    val steps: Int? = null,
+    val stepGoal: Int? = null,
+)
 
 object Sharing {
     // No 0/O or 1/I, so a code read out over the phone can't be misheard.
