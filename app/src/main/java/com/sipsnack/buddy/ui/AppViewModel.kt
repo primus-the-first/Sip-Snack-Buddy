@@ -72,12 +72,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The shared pair, live, on both phones. Null when Firebase isn't set up or nothing exists yet. */
     val pair: StateFlow<PairState?> = Pairing.observePair().stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    /** Her last 7 shared days, re-listened whenever she pauses or resumes. */
+    /** Her last 7 shared days, re-listened when she pauses or resumes and when the date changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val week: StateFlow<List<DayDoc>> = pair
-        .map { it?.sharing == true && !it.paused }
+    val week: StateFlow<List<DayDoc>> = combine(pair.map { it?.sharing == true && !it.paused }, today) { live, day -> live to day }
         .distinctUntilChanged()
-        .flatMapLatest { Pairing.observeWeek() }
+        .flatMapLatest { (_, day) -> Pairing.observeWeek(day.minusDays(6).toString()) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val myUid = MutableStateFlow<String?>(null)

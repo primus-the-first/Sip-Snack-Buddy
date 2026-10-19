@@ -21,8 +21,8 @@ android {
         applicationId = "com.sipsnack.buddy"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.4.0"
+        versionCode = 10
+        versionName = "0.4.1"
         // Real phones only: 64-bit ARM and older 32-bit ARM. The on-device labelling model is native code per chip.
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")

@@ -107,6 +107,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit, onSharing: () -> Unit) 
         TextButton(onClick = { confirmWipe = true }, modifier = Modifier.heightIn(min = 48.dp)) {
             Text("Delete all my data", style = SipType.Body.copy(color = Sip.Sky))
         }
+        Text("Version ${com.sipsnack.buddy.BuildConfig.VERSION_NAME}", style = SipType.Small, modifier = Modifier.padding(horizontal = 12.dp))
         TextButton(onClick = vm::switchRole, modifier = Modifier.heightIn(min = 48.dp)) {
             Text("Wrong phone role? Switch phone role", style = SipType.Small.copy(color = Sip.Muted))
         }

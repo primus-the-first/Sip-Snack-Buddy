@@ -6,7 +6,6 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.Query
 import com.sipsnack.buddy.PAIR_ID
 import com.sipsnack.buddy.rules.LogKind
 import com.sipsnack.buddy.rules.ShareLevel
@@ -224,16 +223,25 @@ object Pairing {
         }
     }
 
-    /** The last 7 shared days, newest first. Fails quietly (empty) when she's paused or not sharing. */
-    fun observeWeek(): Flow<List<DayDoc>> {
+    /**
+     * Shared days from [fromDate] (yyyy-mm-dd) on, newest first. Asked as an ascending range on the id, which
+     * Firestore's built-in index serves. Descending by id (and limitToLast, which the SDK sends as descending)
+     * needs a custom index, and without it his view stayed empty. Retries after errors, such as while she is
+     * paused or a seat is still linking.
+     */
+    fun observeWeek(fromDate: String): Flow<List<DayDoc>> {
         if (!available) return flowOf(emptyList())
         return callbackFlow {
             uid()
-            val reg = days.orderBy(FieldPath.documentId(), Query.Direction.DESCENDING).limit(7)
+            val reg = days.whereGreaterThanOrEqualTo(FieldPath.documentId(), fromDate).orderBy(FieldPath.documentId())
                 .addSnapshotListener { snap, err ->
-                    trySend(if (err != null || snap == null) emptyList() else snap.documents.mapNotNull { it.toDay() })
+                    if (err != null) close(err) else trySend(snap?.documents.orEmpty().mapNotNull { it.toDay() }.reversed())
                 }
             awaitClose { reg.remove() }
+        }.retryWhen { _, attempt ->
+            emit(emptyList())
+            delay(minOf(60_000L, 5_000L * (attempt + 1)))
+            true
         }
     }
 
