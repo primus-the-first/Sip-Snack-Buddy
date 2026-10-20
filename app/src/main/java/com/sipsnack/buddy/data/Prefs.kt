@@ -76,6 +76,18 @@ class Prefs(context: Context) {
                 .putLong("stepLast", value.last).putLong("stepCarried", value.carried).apply()
         }
 
+    /** Each day's step count (yyyy-mm-dd to steps) for History. Keeps a little over a year. */
+    var stepHistory: Map<String, Int>
+        get() = runCatching {
+            val o = org.json.JSONObject(sp.getString("stepHistory", null) ?: "{}")
+            o.keys().asSequence().associateWith { o.getInt(it) }
+        }.getOrDefault(emptyMap())
+        set(value) {
+            val o = org.json.JSONObject()
+            value.entries.sortedBy { it.key }.takeLast(400).forEach { o.put(it.key, it.value) }
+            sp.edit().putString("stepHistory", o.toString()).apply()
+        }
+
     /** Her medicines (once a day each). Becoatin is set up the first time her phone opens this version. */
     var meds: List<com.sipsnack.buddy.rules.Med>
         get() = com.sipsnack.buddy.rules.Meds.decode(sp.getString("meds", null))

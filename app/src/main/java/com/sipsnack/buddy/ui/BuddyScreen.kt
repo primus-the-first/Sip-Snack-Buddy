@@ -75,7 +75,7 @@ private val cheers = listOf(
 
 /** His phone: her day, live, read-only. He can cheer; he can't change anything of hers. */
 @Composable
-fun BuddyScreen(vm: AppViewModel) {
+fun BuddyScreen(vm: AppViewModel, onHistory: () -> Unit) {
     val pair by vm.pair.collectAsState()
     val me by vm.myUid.collectAsState()
     val week by vm.week.collectAsState()
@@ -125,6 +125,7 @@ fun BuddyScreen(vm: AppViewModel) {
                 if (pair?.allowAdds != false) LogForHer(vm, waiting.size)
                 if (todayDoc != null && todayDoc.day.events.isNotEmpty()) HerDay(todayDoc)
                 if (week.isNotEmpty()) WeekCard(week)
+                OutlineButton("See her history", onClick = onHistory, modifier = Modifier.fillMaxWidth())
                 PrimaryButton("Send a cheer", onClick = { cheering = true }, modifier = Modifier.fillMaxWidth())
             }
         }

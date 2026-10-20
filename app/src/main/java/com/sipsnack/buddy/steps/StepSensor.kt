@@ -60,6 +60,7 @@ object StepSensor {
         val today = LocalDate.now()
         val next = Steps.update(prefs.stepState, raw, today.toString(), today.minusDays(1).toString())
         prefs.stepState = next
+        prefs.stepHistory = prefs.stepHistory + (next.day to next.steps)
         return next.steps
     }
 

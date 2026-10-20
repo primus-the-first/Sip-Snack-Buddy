@@ -205,6 +205,14 @@ object Pairing {
 
     suspend fun readDay(date: String): DayDoc? = days.document(date).get().await().toDay()
 
+    /** Her shared days from [fromDate] on, for History. Same ascending range as [observeWeek], so no custom index. */
+    suspend fun readDays(fromDate: String): List<DayDoc> {
+        if (!available) return emptyList()
+        uid()
+        return days.whereGreaterThanOrEqualTo(FieldPath.documentId(), fromDate).orderBy(FieldPath.documentId())
+            .get().await().documents.mapNotNull { it.toDay() }
+    }
+
     /**
      * Live pair state. A Firestore listener dies on its first error, and the first read is refused until
      * this phone holds a seat, so the listener restarts a few seconds after any error.

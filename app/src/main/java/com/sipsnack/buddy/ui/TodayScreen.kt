@@ -59,7 +59,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.ceil
 
 @Composable
-fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, onSharing: () -> Unit) {
+fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, onSharing: () -> Unit, onHistory: () -> Unit) {
     val logs by vm.todayLogs.collectAsState()
     val goal by vm.goal.collectAsState()
     val cups = Hydration.cups(logs.map { it.toEntry() })
@@ -144,7 +144,12 @@ fun TodayScreen(vm: AppViewModel, onSnap: () -> Unit, onSettings: () -> Unit, on
         }
 
         Column {
-            Text("Today so far", style = SipType.Section, modifier = Modifier.padding(bottom = 6.dp))
+            Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Today so far", style = SipType.Section, modifier = Modifier.weight(1f))
+                TextButton(onClick = onHistory, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("See history", style = SipType.Label.copy(color = Sip.Sky))
+                }
+            }
             if (logs.isEmpty()) {
                 Text("Nothing yet. Your first sip starts the ring.", style = SipType.Small, modifier = Modifier.padding(vertical = 12.dp))
             }

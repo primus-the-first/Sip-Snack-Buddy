@@ -45,6 +45,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
+import com.sipsnack.buddy.rules.DayStats
+import com.sipsnack.buddy.rules.History
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = AppDb.get(app).logs()
@@ -122,6 +125,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val shareMeds = MutableStateFlow(prefs.shareMeds)
     val memesOn = MutableStateFlow(prefs.memesOn)
+
+    /** History by date: 60 days, so 30 can be shown against the 30 before. Null while loading. */
+    val history = MutableStateFlow<Map<String, DayStats>?>(null)
+    val historyProblem = MutableStateFlow<String?>(null)
     val nudgesOn = MutableStateFlow(prefs.nudgesOn)
 
     init {
@@ -212,6 +219,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /** [hers]: her shared days on his phone. Otherwise this phone's own logs and steps. */
+    fun loadHistory(hers: Boolean) {
+        history.value = null
+        historyProblem.value = null
+        viewModelScope.launch {
+            val from = LocalDate.now().minusDays(60)
+            runCatching {
+                if (hers) {
+                    Pairing.readDays(from.toString()).associate { it.date to it.toStats() }
+                } else {
+                    val logs = dao.betweenNow(from.startMillis(), LocalDate.now().plusDays(1).startMillis()).map { it.toEntry() }
+                    History.fromLogs(logs, ZoneId.systemDefault(), prefs.goal, prefs.stepGoal, prefs.stepHistory, tracksMeds = prefs.meds.isNotEmpty())
+                }
+            }.onSuccess { history.value = it }
+                .onFailure { historyProblem.value = it.reason(); history.value = emptyMap() }
+        }
+    }
+
+    private fun DayDoc.toStats() = DayStats(
+        date = date,
+        cups = day.cups,
+        goal = day.goal,
+        steps = day.steps,
+        stepGoal = day.stepGoal,
+        meals = day.events.takeIf { it.isNotEmpty() }?.count { it.kind == LogKind.MEAL },
+        medsTaken = day.meds?.takeIf { it.isNotEmpty() }?.all { it.takenAt != null },
+    )
 
     fun setStepGoal(value: Int) {
         prefs.stepGoal = value

@@ -40,6 +40,7 @@ import com.sipsnack.buddy.ui.ShareAskCard
 import com.sipsnack.buddy.ui.ShareMedsCard
 import com.sipsnack.buddy.ui.SharingScreen
 import com.sipsnack.buddy.ui.CameraScreen
+import com.sipsnack.buddy.ui.HistoryScreen
 import com.sipsnack.buddy.ui.MemeCard
 import com.sipsnack.buddy.ui.SettingsScreen
 import com.sipsnack.buddy.ui.TodayScreen
@@ -69,23 +70,27 @@ class MainActivity : ComponentActivity() {
                 val shareMeds by vm.shareMeds.collectAsState()
                 val pairState by vm.pair.collectAsState()
 
-                BackHandler(enabled = screen in listOf("camera", "settings", "sharing")) { screen = "today" }
+                BackHandler(enabled = screen in listOf("camera", "settings", "sharing", "history", "herhistory")) {
+                    screen = if (screen == "herhistory") "her" else "today"
+                }
 
                 Box(Modifier.fillMaxSize().background(Sip.Ink)) {
                     when {
                         role == null -> RoleScreen(onChoose = { vm.chooseRole(it); screen = if (it == "buddy") "her" else "today" })
                         role == "buddy" && screen == "camera" -> CameraScreen(vm, onDone = { screen = "today" })
                         role == "buddy" && screen == "settings" -> SettingsScreen(vm, onBack = { screen = "today" }, onSharing = {})
+                        role == "buddy" && screen == "herhistory" -> HistoryScreen(vm, hers = true, onBack = { screen = "her" })
+                        screen == "history" -> HistoryScreen(vm, hers = false, onBack = { screen = "today" })
                         role == "buddy" -> BuddyTabs(current = if (screen == "today") "today" else "her", onPick = { screen = it }) { inner ->
                             Box(inner.consumeWindowInsets(WindowInsets.navigationBars)) {
-                                if (screen == "today") TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = {})
-                                else BuddyScreen(vm)
+                                if (screen == "today") TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = {}, onHistory = { screen = "history" })
+                                else BuddyScreen(vm, onHistory = { screen = "herhistory" })
                             }
                         }
                         screen == "camera" -> CameraScreen(vm, onDone = { screen = "today" })
                         screen == "settings" -> SettingsScreen(vm, onBack = { screen = "today" }, onSharing = { screen = "sharing" })
                         screen == "sharing" -> SharingScreen(vm, onBack = { screen = "today" })
-                        else -> TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = { screen = "sharing" })
+                        else -> TodayScreen(vm, onSnap = { screen = "camera" }, onSettings = { screen = "settings" }, onSharing = { screen = "sharing" }, onHistory = { screen = "history" })
                     }
 
                     if (role == "her" && askShare && moment == null) {
