@@ -49,7 +49,7 @@ class StepService : Service(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        val steps = StepSensor.record(this, event.values[0].toLong())
+        val steps = StepSensor.record(this, event.values[0].toLong(), StepSensor.stepTime(event))
         val now = System.currentTimeMillis()
         if (steps != lastShown && now - lastShownAt > 30_000) {
             lastShown = steps

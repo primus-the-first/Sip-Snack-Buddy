@@ -68,12 +68,12 @@ class Prefs(context: Context) {
     var stepState: com.sipsnack.buddy.rules.StepState?
         get() {
             val day = sp.getString("stepDay", null) ?: return null
-            return com.sipsnack.buddy.rules.StepState(day, sp.getLong("stepBase", 0), sp.getLong("stepLast", 0), sp.getLong("stepCarried", 0))
+            return com.sipsnack.buddy.rules.StepState(day, sp.getLong("stepBase", 0), sp.getLong("stepLast", 0), sp.getLong("stepCarried", 0), sp.getLong("stepLastAt", 0))
         }
         set(value) {
             if (value == null) return
             sp.edit().putString("stepDay", value.day).putLong("stepBase", value.base)
-                .putLong("stepLast", value.last).putLong("stepCarried", value.carried).apply()
+                .putLong("stepLast", value.last).putLong("stepCarried", value.carried).putLong("stepLastAt", value.lastAtMillis).apply()
         }
 
     /** Each day's step count (yyyy-mm-dd to steps) for History. Keeps a little over a year. */

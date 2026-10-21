@@ -9,12 +9,14 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.sipsnack.buddy.data.Prefs
 import com.sipsnack.buddy.rules.Steps
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.coroutines.resume
 
 /**
@@ -29,8 +31,11 @@ object StepSensor {
         Build.VERSION.SDK_INT < 29 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
 
+    /** A reading of the counter and when its latest step happened (null if the sensor's clock looks wrong). */
+    private class Reading(val raw: Long, val lastStepAt: Long?)
+
     /** One reading of steps since the phone started, or null if there's no sensor or permission. */
-    private suspend fun read(context: Context): Long? {
+    private suspend fun read(context: Context): Reading? {
         if (!available(context) || !allowed(context)) return null
         val manager = context.getSystemService(SensorManager::class.java)
         val sensor = manager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return null
@@ -39,7 +44,7 @@ object StepSensor {
                 val listener = object : SensorEventListener {
                     override fun onSensorChanged(event: SensorEvent) {
                         manager.unregisterListener(this)
-                        if (cont.isActive) cont.resume(event.values[0].toLong())
+                        if (cont.isActive) cont.resume(Reading(event.values[0].toLong(), stepTime(event)))
                     }
 
                     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -51,14 +56,22 @@ object StepSensor {
     }
 
     /** Takes a reading and returns today's steps, or null when steps can't be counted on this phone. */
-    suspend fun todaySteps(context: Context): Int? = read(context)?.let { record(context, it) }
+    suspend fun todaySteps(context: Context): Int? = read(context)?.let { record(context, it.raw, it.lastStepAt) }
+
+    /** When the sensor says its latest step happened, on the wall clock. */
+    fun stepTime(event: SensorEvent): Long? =
+        Steps.stepTime(System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos(), event.timestamp)
 
     /** Turns a raw counter value into today's steps and saves where today stands. */
     @Synchronized
-    fun record(context: Context, raw: Long): Int {
+    fun record(context: Context, raw: Long, lastStepAt: Long?): Int {
         val prefs = Prefs(context)
-        val today = LocalDate.now()
-        val next = Steps.update(prefs.stepState, raw, today.toString(), today.minusDays(1).toString())
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val next = Steps.update(
+            prefs.stepState, raw, today.toString(), today.minusDays(1).toString(),
+            at = System.currentTimeMillis(), lastStepAt = lastStepAt, dayStart = today.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
         prefs.stepState = next
         prefs.stepHistory = prefs.stepHistory + (next.day to next.steps)
         return next.steps
